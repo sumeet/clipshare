@@ -1,3 +1,4 @@
+import time
 import flask
 
 import gi
@@ -16,6 +17,32 @@ def refresh_osg(clipboard):
     print(response)
 
 
+LAST_OPERATION_TIME = 0
+
+import functools
+def has_a_5_second_lockdown_in_front_of_it(func):
+    @functools.wraps(func)
+    def newfunc(*args, **kwargs):
+        global LAST_OPERATION_TIME
+
+        print("starting context manager")
+        if time.time() - LAST_OPERATION_TIME <= 5:
+            print("did something pretty recently, so bailing")
+            return
+
+        try:
+            LAST_OPERATION_TIME = time.time()
+            print("running the body")
+            func(*args, **kwargs)
+        finally:
+            print("setting the time")
+            LAST_OPERATION_TIME = time.time()
+    
+    return newfunc
+
+
+
+@has_a_5_second_lockdown_in_front_of_it
 def callBack(clip, event):
     global clipboard
     print("clipboard changed, retrieving text from clipboard")
@@ -24,13 +51,13 @@ def callBack(clip, event):
     refresh_osg(clipboard)
 
 
-clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+@has_a_5_second_lockdown_in_front_of_it
 def set_text(text):
+    clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+
+
     print('set text')
     clip.set_text(text, -1)
-    # gotta do this so the process doesn't block here???
-    print('wait for test')
-    clip.wait_for_text()
 
     print('store')
     clip.store()
@@ -51,8 +78,11 @@ def watch_clipboard_for_changes():
 
 
 if __name__ == '__main__':
-    t = threading.Thread(name='gtk', target=watch_clipboard_for_changes)
-    t.start()
+    set_text("testing this bullassshit")
+    time.sleep(1)
+    exit(0)
+    #t = threading.Thread(name='gtk', target=watch_clipboard_for_changes)
+    #t.start()
 
     app.run(host='0.0.0.0', port=31337, debug=True)
     #t.join()
