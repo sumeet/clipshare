@@ -1,9 +1,12 @@
 import time
 import flask
 
-import gi
-gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk
+#import gi
+#gi.require_version('Gtk', '3.0')
+#from gi.repository import Gtk, Gdk
+import pygtk
+pygtk.require('2.0')
+import gtk
 
 import requests
 import threading
@@ -51,16 +54,18 @@ def callBack(clip, event):
     refresh_osg(clipboard)
 
 
+clip = gtk.clipboard_get()
 @has_a_5_second_lockdown_in_front_of_it
 def set_text(text):
-    clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+    #clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
 
 
     print('set text')
-    clip.set_text(text, -1)
+    clip.set_text(text)
 
     print('store')
     clip.store()
+
 
 
 app = flask.Flask(__name__)
@@ -73,16 +78,21 @@ def handle_remote_paste():
 
 
 def watch_clipboard_for_changes():
-    clip.connect('owner-change',callBack)
-    Gtk.main()
+    while True:
+        try:
+            clip.connect('owner-change',callBack)
+            gtk.main()
+            #Gtk.main()
+        except Exception as e:
+            print("gtk died: %r, restarting" % e)
 
+
+def flask_app():
+    app.run(host='0.0.0.0', port=31337, debug=True)
 
 if __name__ == '__main__':
-    set_text("testing this bullassshit")
-    time.sleep(1)
-    exit(0)
-    #t = threading.Thread(name='gtk', target=watch_clipboard_for_changes)
-    #t.start()
-
-    app.run(host='0.0.0.0', port=31337, debug=True)
+    t = threading.Thread(target=watch_clipboard_for_changes)
+    t.start()
+    #watch_clipboard_for_changes()
     #t.join()
+    flask_app()
