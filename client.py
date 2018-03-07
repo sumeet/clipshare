@@ -2,8 +2,12 @@ import asyncore
 import pickle as json
 import socket
 import struct
+import sys
+import threading
 
+from PyQt5.QtWidgets import QApplication
 
+from local_clipboard import LocalClipboard
 from coordinator import ClipboardsCoordinator
 
 
@@ -91,32 +95,34 @@ class ClientHandler(asyncore.dispatcher_with_send):
                 raise
 
 
-class ClipboardServer(asyncore.dispatcher):
+class ClipboardClient(asyncore.dispatcher):
 
     def __init__(self, coordinator):
         super().__init__()
         self._coordinator = coordinator
 
     def run(self, host, port):
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.set_reuse_addr()
-        self.bind((host, port))
-        self.listen(5)
+        self.create_socket()
+        self.connect((host, port))
 
-    def handle_accept(self):
-        pair = self.accept()
-        if not pair:
-            return
-
-        sock, addr = pair
-        print('Incoming connection from %s' % repr(addr))
+        sock = self.socket
         client_handler = ClientHandler(sock)
         remote_clipboard = RemoteClipboard(client_handler)
         self._coordinator.add_clipboard(remote_clipboard)
 
 
 if __name__ == '__main__':
+    qt_app = QApplication([])
+
+    local_clipboard = LocalClipboard(qt_app.clipboard())
     coordinator = ClipboardsCoordinator()
-    server = ClipboardServer(coordinator)
-    server.run('0.0.0.0', 8392)
-    asyncore.loop()
+    coordinator.add_clipboard(local_clipboard)
+
+    client = ClipboardClient(coordinator)
+    client.run('192.168.100.107', 8392)
+
+    async_event_loop_thread = threading.Thread(target=asyncore.loop)
+    async_event_loop_thread.start()
+
+    sys.exit(qt_app.exec_())
+

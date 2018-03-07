@@ -1,6 +1,6 @@
 from collections import namedtuple
 import functools
-import json
+import pickle as json
 
 
 class ServerClipboard(object):

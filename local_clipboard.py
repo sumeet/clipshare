@@ -2,34 +2,23 @@ from PyQt5.QtCore import QMimeData
 from PyQt5.QtCore import QByteArray
 from PyQt5.QtCore import QBuffer
 from PyQt5.QtCore import QIODevice
-from PyQt5.QtWidgets import QApplication
-
 
 class LocalClipboard(object):
-
-    @classmethod
-    def new(cls):
-        return cls(QApplication([]))
 
     def __init__(self, qt_clipboard):
         self._qt_clipboard = qt_clipboard
 
     def update(self, clipboard_contents):
-        qmimedata_to_set = qmimedata.deserialize(clipboard_contents)
+        qmimedata_to_set = QMimeDataSerializer.deserialize(
+            clipboard_contents)
         self._qt_clipboard.setMimeData(qmimedata_to_set)
 
     def set_callback_for_updates(self, callback):
-        # as of now the server can only send us one kind of message
-        def on_clip_owner_change(clip, event):
-            # FIXME: this is hardcoded to text
-            clipboard_contents = clip.wait_for_text()
+        def when_clipboard_changes():
+            clipboard_contents = QMimeDataSerializer.serialize(
+                self._qt_clipboard.mimeData())
             callback(clipboard_contents)
-
-        #self._qt_clipboard.connect('owner-change', on_clip_owner_change)
-        # TODO: start the gtk loop in a thread
-        # TODO: have to configure Gtk for threading correctly using the link
-        #       shivaram gave me
-        # Gtk.main()
+        self._qt_clipboard.dataChanged.connect(when_clipboard_changes)
 
 
 class QMimeDataSerializer(object):
@@ -68,6 +57,8 @@ class QMimeDataSerializer(object):
 
 
 if __name__ == '__main__':
+    from PyQt5.QtWidgets import QApplication
+
     app = QApplication([])
     clipboard = app.clipboard()
 
