@@ -7,9 +7,6 @@ import struct
 from coordinator import ClipboardsCoordinator
 
 
-MAX_MSG_SIZE = 100_000_000_000_000            # hmm
-
-
 class RemoteClipboard(object):
 
     def __init__(self, client_handler):
@@ -40,7 +37,6 @@ class ClientHandler(asyncore.dispatcher_with_send):
     callback = lambda *args: None
 
     def handle_read(self):
-        #data = self.recv(MAX_MSG_SIZE)
         data = self._recv_msg()
         if data:
             self.callback(data)

@@ -5,13 +5,8 @@ import struct
 import sys
 import threading
 
-from PyQt5.QtWidgets import QApplication
-
 from local_clipboard import LocalClipboard
 from coordinator import ClipboardsCoordinator
-
-
-MAX_MSG_SIZE = 100_000_000_000_000            # hmm
 
 
 class RemoteClipboard(object):
@@ -44,7 +39,6 @@ class ClientHandler(asyncore.dispatcher_with_send):
     callback = lambda *args: None
 
     def handle_read(self):
-        #data = self.recv(MAX_MSG_SIZE)
         data = self._recv_msg()
         if data:
             self.callback(data)
@@ -112,17 +106,14 @@ class ClipboardClient(asyncore.dispatcher):
 
 
 if __name__ == '__main__':
-    qt_app = QApplication([])
-
-    local_clipboard = LocalClipboard(qt_app.clipboard())
+    local_clipboard = LocalClipboard.new()
     coordinator = ClipboardsCoordinator()
     coordinator.add_clipboard(local_clipboard)
 
     client = ClipboardClient(coordinator)
-    client.run('192.168.100.107', 8392)
+    client.run('192.168.0.44', 8392)
 
     async_event_loop_thread = threading.Thread(target=asyncore.loop)
     async_event_loop_thread.start()
 
-    sys.exit(qt_app.exec_())
-
+    local_clipboard.poll_forever()
