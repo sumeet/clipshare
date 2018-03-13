@@ -1,5 +1,4 @@
 import signal
-import threading
 
 from PyQt5.QtCore import QMimeData
 from PyQt5.QtCore import QByteArray
