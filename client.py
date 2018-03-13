@@ -111,7 +111,7 @@ if __name__ == '__main__':
     coordinator.add_clipboard(local_clipboard)
 
     client = ClipboardClient(coordinator)
-    client.run('192.168.0.44', 8392)
+    client.run('somt.hopto.org', 8392)
 
     async_event_loop_thread = threading.Thread(target=asyncore.loop)
     async_event_loop_thread.start()
