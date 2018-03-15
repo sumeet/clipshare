@@ -1,3 +1,4 @@
+import asyncio
 import signal
 
 from PyQt5.QtCore import QMimeData
@@ -5,17 +6,26 @@ from PyQt5.QtCore import QByteArray
 from PyQt5.QtCore import QBuffer
 from PyQt5.QtCore import QIODevice
 from PyQt5.QtWidgets import QApplication
+from quamash import QEventLoop
 
 
-class LinuxClipboard(object):
+class LinuxClipboard:
 
     @classmethod
     def new(cls):
-        return cls(QApplication([]))
+        # lol, move this somewhere better
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        app = QApplication([])
+        loop = QEventLoop(app)
+        return cls(loop, app.clipboard())
 
-    def __init__(self, qt_app):
-        self._qt_app = qt_app
-        self._qt_clipboard = qt_app.clipboard()
+    def __init__(self, event_loop, qt_clipboard):
+        self._event_loop = event_loop
+        self._qt_clipboard = qt_clipboard
+
+    @property
+    def event_loop(self):
+        return self._event_loop
 
     def update(self, clipboard_contents):
         qmimedata_to_set = QMimeDataSerializer.deserialize(
@@ -26,16 +36,23 @@ class LinuxClipboard(object):
         def when_clipboard_changes():
             mime_data = self._qt_clipboard.mimeData()
             clipboard_contents = QMimeDataSerializer.serialize(mime_data)
-            callback(clipboard_contents)
+            print("linux clipboard changed, updating")
+            asyncio.ensure_future(callback(clipboard_contents),
+                                  loop=self._event_loop)
+            #await callback(clipboard_contents)
         self._qt_clipboard.dataChanged.connect(when_clipboard_changes)
 
-    def poll_forever(self):
+    # TODO: remove this method
+    async def poll_forever(self):
         self._fix_ctrl_c()
-        return self._qt_app.exec_()
+        print("running the qt loop")
+        return await self._qt_app.exec_()
 
     # ctrl-c won't work without this: https://stackoverflow.com/a/5160720
     def _fix_ctrl_c(self):
-        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        # maybe we don't need to do this anymore
+        pass
+        #signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
 class QMimeDataSerializer(object):
