@@ -27,7 +27,7 @@ class LinuxClipboard:
     def event_loop(self):
         return self._event_loop
 
-    def update(self, clipboard_contents):
+    async def update(self, clipboard_contents):
         qmimedata_to_set = QMimeDataSerializer.deserialize(
             clipboard_contents)
         self._qt_clipboard.setMimeData(qmimedata_to_set)

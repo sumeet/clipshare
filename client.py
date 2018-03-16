@@ -20,7 +20,7 @@ if __name__ == '__main__':
     coordinator.add_clipboard(local_clipboard)
 
     websocket_handler = WebsocketHandler(coordinator)
-    c = client(websocket_handler, "ws://127.0.0.1:8392")
+    c = client(websocket_handler, "ws://100.114.54.75:8392")
 
     asyncio.set_event_loop(local_clipboard.event_loop)
     local_clipboard.event_loop.run_until_complete(c)

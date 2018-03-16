@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 from ScriptingBridge import NSArray
@@ -13,12 +14,18 @@ class MacClipboard(object):
 
     @classmethod
     def new(cls):
-        return cls(NSPasteboard.generalPasteboard())
+        # just use the default asyncio event loop
+        return cls(asyncio.get_event_loop(), NSPasteboard.generalPasteboard())
 
-    def __init__(self, pasteboard):
+    def __init__(self, event_loop, pasteboard):
+        self._event_loop = event_loop
         self._pasteboard = pasteboard
 
-    def update(self, clipboard_contents):
+    @property
+    def event_loop(self):
+        return self._event_loop
+
+    async def update(self, clipboard_contents):
         object_to_set = self._get_clipboard_object_to_set(clipboard_contents)
         if not object_to_set:
             all_types = repr(clipboard_contents.keys())
@@ -34,16 +41,17 @@ class MacClipboard(object):
 
     def set_callback_for_updates(self, callback):
         self._callback = callback
+        asyncio.ensure_future(self.poll_forever(), loop=self._event_loop)
 
-    def poll_forever(self):
+    async def poll_forever(self):
         poller = Poller(self._pasteboard)
 
         while True:
             clipboard_contents = poller.poll_for_new_clipboard_contents()
             if clipboard_contents:
                 print('found clipboard contents, calling back')
-                self._callback(clipboard_contents)
-            time.sleep(CLIPBOARD_POLL_INTERVAL_SECONDS)
+                await self._callback(clipboard_contents)
+            await asyncio.sleep(CLIPBOARD_POLL_INTERVAL_SECONDS)
 
     def _get_clipboard_object_to_set(self, clipboard_contents):
         image_type = self._find_image_type(clipboard_contents)
