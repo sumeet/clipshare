@@ -9,8 +9,12 @@ from PyQt5.QtWidgets import QApplication
 from quamash import QEventLoop
 
 
+# TODO: rename  this to QtClipboard?
 class LinuxClipboard:
 
+    # XXX: this interface seems a bit strange. we're creating a clipboard
+    # object and right there we're also creating the event loop. it works for
+    # now! but it might change
     @classmethod
     def new(cls):
         # lol, move this somewhere better
