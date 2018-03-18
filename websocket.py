@@ -1,6 +1,11 @@
 from remote_clipboard import RemoteClipboard
 
 
+# by default, there's a limit of ~1MB. our payloads can be much larger than
+# that, if transferring images, so let's just turn the limit off
+MAX_PAYLOAD_SIZE = None
+
+
 class WebsocketHandler(object):
 
     def __init__(self, coordinator):

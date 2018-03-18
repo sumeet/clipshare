@@ -5,11 +5,12 @@ import websockets
 
 from local_clipboard import LocalClipboard
 from coordinator import ClipboardsCoordinator
+from websocket import MAX_PAYLOAD_SIZE
 from websocket import WebsocketHandler
 
 
 async def client(websocket_handler, url):
-    async with websockets.connect(url) as websocket:
+    async with websockets.connect(url,  max_size=MAX_PAYLOAD_SIZE) as websocket:
         await websocket_handler.handle(websocket, "the path is ignored anyway")
 
 
