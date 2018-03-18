@@ -6,7 +6,7 @@ from remote_clipboard import RemoteClipboard
 MAX_PAYLOAD_SIZE = None
 
 
-class WebsocketHandler(object):
+class WebsocketHandler:
 
     def __init__(self, coordinator):
         self._coordinator = coordinator
@@ -24,7 +24,7 @@ class WebsocketHandler(object):
             await sock.callback(incoming_msg)
 
 
-class Sock(object):
+class Sock:
 
     # by default the callback doesn't do anything. it has to be set by the
     # coordinator. this should be overridden by the caller using the setter

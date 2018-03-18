@@ -1,7 +1,7 @@
 import functools
 
 
-class ClipboardsCoordinator(object):
+class ClipboardsCoordinator:
 
     def __init__(self):
         self._clipboards = []
@@ -29,7 +29,7 @@ class ClipboardsCoordinator(object):
         return [c for c in self._clipboards if c is not clipboard]
 
 
-class ClipboardThatOnlyUpdatesOnChanges(object):
+class ClipboardThatOnlyUpdatesOnChanges:
 
     def __init__(self, clipboard):
         self._clipboard = clipboard

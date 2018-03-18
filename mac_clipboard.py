@@ -10,7 +10,7 @@ from ScriptingBridge import NSString
 CLIPBOARD_POLL_INTERVAL_SECONDS = 0.5
 
 
-class MacClipboard(object):
+class MacClipboard:
 
     @classmethod
     def new(cls):
@@ -70,7 +70,7 @@ class MacClipboard(object):
         return next(image_types, None)
 
 
-class Poller(object):
+class Poller:
 
     def __init__(self, pasteboard):
         self._pasteboard = pasteboard

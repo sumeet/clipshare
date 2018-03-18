@@ -1,7 +1,7 @@
 import pickle           # lol it works
 
 
-class RemoteClipboard(object):
+class RemoteClipboard:
 
     def __init__(self, sock):
         self._sock = sock

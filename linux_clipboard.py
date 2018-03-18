@@ -1,10 +1,10 @@
 import asyncio
 import signal
 
-from PyQt5.QtCore import QMimeData
-from PyQt5.QtCore import QByteArray
 from PyQt5.QtCore import QBuffer
+from PyQt5.QtCore import QByteArray
 from PyQt5.QtCore import QIODevice
+from PyQt5.QtCore import QMimeData
 from PyQt5.QtWidgets import QApplication
 from quamash import QEventLoop
 
@@ -39,6 +39,8 @@ class LinuxClipboard:
             print("linux clipboard changed, updating")
             asyncio.ensure_future(callback(clipboard_contents),
                                   loop=self._event_loop)
+            # TODO: i just copy and pasted the above from stack overflow. why
+            # do i need to do the above, and why can't i just do the below?
             #await callback(clipboard_contents)
         self._qt_clipboard.dataChanged.connect(when_clipboard_changes)
 
@@ -55,7 +57,7 @@ class LinuxClipboard:
         #signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
-class QMimeDataSerializer(object):
+class QMimeDataSerializer:
 
     @classmethod
     def serialize(cls, qmimedata):
