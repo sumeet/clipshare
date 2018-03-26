@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import QApplication
 from quamash import QEventLoop
 
 
-# TODO: rename  this to QtClipboard?
+# TODO: rename this to QtClipboard?
 class LinuxClipboard:
 
     # XXX: this interface seems a bit strange. we're creating a clipboard
