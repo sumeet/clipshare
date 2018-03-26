@@ -15,13 +15,11 @@ class WebsocketHandler:
         print("sum1 connected")
         sock = Sock(websocket)
         remote_clipboard = RemoteClipboard(sock)
-        self._coordinator.add_clipboard(remote_clipboard)
-
-        while True:
-            print('gonna wait for the first msg')
-            incoming_msg = await websocket.recv()
-            print(f'got a msg of size {len(incoming_msg)}')
-            await sock.callback(incoming_msg)
+        with self._coordinator.with_clipboard(remote_clipboard):
+            while True:
+                incoming_msg = await websocket.recv()
+                print(f'got a msg of size {len(incoming_msg)}')
+                await sock.callback(incoming_msg)
 
 
 class Sock:

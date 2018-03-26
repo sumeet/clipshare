@@ -1,4 +1,5 @@
 import asyncio
+import os
 import threading
 
 import websockets
@@ -7,6 +8,9 @@ from local_clipboard import LocalClipboard
 from coordinator import ClipboardsCoordinator
 from websocket import MAX_PAYLOAD_SIZE
 from websocket import WebsocketHandler
+
+
+WS_URL = os.environ['WS_URL']
 
 
 async def client(websocket_handler, url):
@@ -21,7 +25,7 @@ if __name__ == '__main__':
     coordinator.add_clipboard(local_clipboard)
 
     websocket_handler = WebsocketHandler(coordinator)
-    c = client(websocket_handler, "ws://clipshare.goob.es")
+    c = client(websocket_handler, WS_URL)
 
     asyncio.set_event_loop(local_clipboard.event_loop)
     local_clipboard.event_loop.run_until_complete(c)

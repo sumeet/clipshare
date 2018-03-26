@@ -1,3 +1,4 @@
+import contextlib
 import functools
 
 
@@ -5,6 +6,14 @@ class ClipboardsCoordinator:
 
     def __init__(self):
         self._clipboards = []
+
+    @contextlib.contextmanager
+    def with_clipboard(self, clipboard):
+        try:
+            self.add_clipboard(clipboard)
+            yield
+        finally:
+            self.remove_clipboard(clipboard)
 
     def add_clipboard(self, clipboard):
         # wrap the clipboard with ClipboardThatOnlyUpdatesOnChanges so we don't
@@ -15,7 +24,13 @@ class ClipboardsCoordinator:
         # itself whenever it receives an update
         callback = functools.partial(self.on_update, clipboard)
         clipboard.set_callback_for_updates(callback)
+
         self._clipboards.append(clipboard)
+        print(f'added a clipboard. all clipboards now: {self._clipboards}')
+
+    def remove_clipboard(self, clipboard):
+        self._clipboards = self._get_clipboards_other_than(clipboard)
+        print(f'removed a clipboard. all clipboards now: {self._clipboards}')
 
     async def on_update(self, changed_clipboard, contents):
         print('on update was called')
@@ -26,7 +41,7 @@ class ClipboardsCoordinator:
             await clipboard.update(contents)
 
     def _get_clipboards_other_than(self, clipboard):
-        return [c for c in self._clipboards if c is not clipboard]
+        return [c for c in self._clipboards if c != clipboard]
 
 
 class ClipboardThatOnlyUpdatesOnChanges:
@@ -49,6 +64,9 @@ class ClipboardThatOnlyUpdatesOnChanges:
             self._checksum_of_clipboard = generate_checksum(msg)
             await callback(msg)
         return self._clipboard.set_callback_for_updates(update_cs_and_callback)
+
+    def __eq__(self, other):
+        return self is other or self._clipboard is other
 
 
 def generate_checksum(clipboard_contents):
