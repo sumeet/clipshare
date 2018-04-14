@@ -7,7 +7,7 @@ import time
 import websockets
 
 from local_clipboard import LocalClipboard
-from coordinator import ClipboardsCoordinator
+from relay import Relay
 from websocket import MAX_PAYLOAD_SIZE
 from websocket import WebsocketHandler
 
@@ -35,12 +35,12 @@ async def client(websocket_handler, url):
 
 
 def start_client():
-    coordinator = ClipboardsCoordinator()
+    relay = Relay()
 
     local_clipboard = LocalClipboard.new()
-    coordinator.add_clipboard(local_clipboard)
+    relay.add_clipboard(local_clipboard)
 
-    websocket_handler = WebsocketHandler(coordinator)
+    websocket_handler = WebsocketHandler(relay)
     c = client(websocket_handler, WS_URL)
 
     asyncio.set_event_loop(local_clipboard.event_loop)

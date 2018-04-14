@@ -2,7 +2,7 @@ import contextlib
 import functools
 
 
-class ClipboardsCoordinator:
+class Relay:
 
     def __init__(self):
         self._clipboards = []
@@ -33,7 +33,6 @@ class ClipboardsCoordinator:
         print(f'removed a clipboard. all clipboards now: {self._clipboards}')
 
     async def on_update(self, changed_clipboard, contents):
-        print('on update was called')
         print('all other clipboards: %r' %
               self._get_clipboards_other_than(changed_clipboard))
         for clipboard in self._get_clipboards_other_than(changed_clipboard):

@@ -36,7 +36,7 @@ class MacClipboard:
         self._pasteboard.release()
 
     # by default the callback doesn't do anything. it has to be set by the
-    # coordinator. this should be overwritten by the caller
+    # relay. this should be overwritten by the caller
     _callback = lambda *args: None
 
     def set_callback_for_updates(self, callback):

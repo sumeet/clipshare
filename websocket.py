@@ -8,14 +8,14 @@ MAX_PAYLOAD_SIZE = None
 
 class WebsocketHandler:
 
-    def __init__(self, coordinator):
-        self._coordinator = coordinator
+    def __init__(self, relay):
+        self._relay = relay
 
     async def handle(self, websocket, path):  # yup, we're ignoring path
         print("sum1 connected")
         sock = Sock(websocket)
         remote_clipboard = RemoteClipboard(sock)
-        with self._coordinator.with_clipboard(remote_clipboard):
+        with self._relay.with_clipboard(remote_clipboard):
             while True:
                 incoming_msg = await websocket.recv()
                 print(f'got a msg of size {len(incoming_msg)}')
@@ -25,7 +25,7 @@ class WebsocketHandler:
 class Sock:
 
     # by default the callback doesn't do anything. it has to be set by the
-    # coordinator. this should be overridden by the caller using the setter
+    # relay. this should be overridden by the caller using the setter
     def __init__(self, websocket):
         self._websocket = websocket
         self._callback = lambda *args: None
