@@ -1,15 +1,20 @@
 from asyncio import ensure_future
 import asyncio
+import logging
 import os
 import threading
 import time
 
+import coloredlogs
 import websockets
 
 from local_clipboard import LocalClipboard
 from relay import Relay
 from websocket import MAX_PAYLOAD_SIZE
 from websocket import WebsocketHandler
+
+
+logger = logging.getLogger(__name__)
 
 
 RECONNECT_WAIT_SECONDS = 5
@@ -48,11 +53,13 @@ def start_client():
 
 
 if __name__ == '__main__':
+    coloredlogs.install(level='DEBUG')
+
     while True:
         try:
             start_client()
         except Exception as e:
-            print('got disconnected from the server')
-            print(e)
-            print(f'waiting {RECONNECT_WAIT_SECONDS} before reconnecting')
+            logger.info('got disconnected from the server')
+            logger.debug(e)
+            logger.info(f'waiting {RECONNECT_WAIT_SECONDS} before reconnecting')
             time.sleep(RECONNECT_WAIT_SECONDS)

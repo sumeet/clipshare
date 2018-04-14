@@ -1,4 +1,9 @@
+import logging
+
 from remote_clipboard import RemoteClipboard
+
+
+logger = logging.getLogger(__name__)
 
 
 # by default, there's a limit of ~1MB. our payloads can be much larger than
@@ -12,13 +17,13 @@ class WebsocketHandler:
         self._relay = relay
 
     async def handle(self, websocket, path):  # yup, we're ignoring path
-        print("sum1 connected")
+        logger.debug("connected with %r" % websocket)
         sock = Sock(websocket)
         remote_clipboard = RemoteClipboard(sock)
         with self._relay.with_clipboard(remote_clipboard):
             while True:
                 incoming_msg = await websocket.recv()
-                print(f'got a msg of size {len(incoming_msg)}')
+                logger.debug(f'got a msg of size {len(incoming_msg)}')
                 await sock.callback(incoming_msg)
 
 
@@ -31,7 +36,7 @@ class Sock:
         self._callback = lambda *args: None
 
     async def send_message(self, message):
-        print(f'sending a message of size {len(message)}')
+        logger.debug(f'sending a message of size {len(message)}')
         await self._websocket.send(message)
 
     @property

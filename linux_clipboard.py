@@ -1,5 +1,6 @@
 import asyncio
 import signal
+import logging
 
 from PyQt5.QtCore import QBuffer
 from PyQt5.QtCore import QByteArray
@@ -7,6 +8,9 @@ from PyQt5.QtCore import QIODevice
 from PyQt5.QtCore import QMimeData
 from PyQt5.QtWidgets import QApplication
 from quamash import QEventLoop
+
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: rename this to QtClipboard?
@@ -40,25 +44,13 @@ class LinuxClipboard:
         def when_clipboard_changes():
             mime_data = self._qt_clipboard.mimeData()
             clipboard_contents = QMimeDataSerializer.serialize(mime_data)
-            print("linux clipboard changed, updating")
+            logger.debug("linux clipboard changed, updating")
             asyncio.ensure_future(callback(clipboard_contents),
                                   loop=self._event_loop)
             # TODO: i just copy and pasted the above from stack overflow. why
             # do i need to do the above, and why can't i just do the below?
             #await callback(clipboard_contents)
         self._qt_clipboard.dataChanged.connect(when_clipboard_changes)
-
-    # TODO: remove this method
-    async def poll_forever(self):
-        self._fix_ctrl_c()
-        print("running the qt loop")
-        return await self._qt_app.exec_()
-
-    # ctrl-c won't work without this: https://stackoverflow.com/a/5160720
-    def _fix_ctrl_c(self):
-        # maybe we don't need to do this anymore
-        pass
-        #signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
 class QMimeDataSerializer:

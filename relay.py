@@ -1,5 +1,9 @@
 import contextlib
 import functools
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class Relay:
@@ -26,17 +30,16 @@ class Relay:
         clipboard.set_callback_for_updates(callback)
 
         self._clipboards.append(clipboard)
-        print(f'added a clipboard. all clipboards now: {self._clipboards}')
+        logger.debug(f'added a clipboard. all clipboards now: {self._clipboards}')
 
     def remove_clipboard(self, clipboard):
         self._clipboards = self._get_clipboards_other_than(clipboard)
-        print(f'removed a clipboard. all clipboards now: {self._clipboards}')
+        logger.debug(f'removed a clipboard. all clipboards now: {self._clipboards}')
 
     async def on_update(self, changed_clipboard, contents):
-        print('all other clipboards: %r' %
-              self._get_clipboards_other_than(changed_clipboard))
-        for clipboard in self._get_clipboards_other_than(changed_clipboard):
-            print('updating: %r' % clipboard)
+        all_other_clipboards = self._get_clipboards_other_than(changed_clipboard)
+        for clipboard in all_other_clipboards:
+            logger.debug('sending update to %r' % clipboard)
             await clipboard.update(contents)
 
     def _get_clipboards_other_than(self, clipboard):
@@ -52,7 +55,7 @@ class ClipboardThatOnlyUpdatesOnChanges:
     async def update(self, clipboard_contents):
         checksum = generate_checksum(clipboard_contents)
         if checksum == self._checksum_of_clipboard:
-            print('blocked a redundant update to %r' % self._clipboard)
+            logger.debug('blocked a redundant update to %r' % self._clipboard)
             return
 
         await self._clipboard.update(clipboard_contents)
@@ -66,6 +69,9 @@ class ClipboardThatOnlyUpdatesOnChanges:
 
     def __eq__(self, other):
         return self is other or self._clipboard is other
+
+    def __repr__(self):
+        return '<%s: %r>' % (type(self).__name__, self._clipboard)
 
 
 def generate_checksum(clipboard_contents):
