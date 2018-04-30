@@ -1,5 +1,5 @@
 import asyncio
-import logging
+import log
 import time
 
 from ScriptingBridge import NSArray
@@ -8,7 +8,7 @@ from ScriptingBridge import NSPasteboard
 from ScriptingBridge import NSString
 
 
-logger = logging.getLogger(__name__)
+logger = log.getLogger(__name__)
 
 
 CLIPBOARD_POLL_INTERVAL_SECONDS = 0.5
@@ -33,7 +33,7 @@ class MacClipboard:
         object_to_set = self._extract_settable_nsobject(clipboard_contents)
         if not object_to_set:
             all_types = repr(clipboard_contents.keys())
-            logger.debug('unsupported clipboard payload with types: %s' % all_types)
+            logger.debug('unsupported clipboard payload ' + log.format_obj(clipboard_contents))
         self._ns_pasteboard.clearContents()
         self._ns_pasteboard.writeObjects_(NSArray.arrayWithObject_(object_to_set))
         self._ns_pasteboard.release()
@@ -52,7 +52,7 @@ class MacClipboard:
         while True:
             clipboard_contents = poller.poll_for_new_clipboard_contents()
             if clipboard_contents:
-                logger.debug('found clipboard contents, calling back')
+                logger.debug('detected change ' + log.format_obj(clipboard_contents))
                 await self._callback(clipboard_contents)
             await asyncio.sleep(CLIPBOARD_POLL_INTERVAL_SECONDS)
 

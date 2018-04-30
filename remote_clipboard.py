@@ -1,5 +1,10 @@
 import pickle           # lol it works
 
+import log
+
+
+logger = log.getLogger(__name__)
+
 
 class RemoteClipboard:
 
@@ -15,9 +20,7 @@ class RemoteClipboard:
             try:
                 deserialized = pickle.loads(msg)
             except:
-                print("got a bad payload over the wire from %r: %r" %
-                      (self, msg))
-                print("doing nothing")
+                logger.debug(f"couldn't unpickle {log.format_obj(msg)}")
                 return
             return callback(deserialized)
 

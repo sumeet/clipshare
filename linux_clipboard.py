@@ -1,6 +1,5 @@
 import asyncio
 import signal
-import logging
 
 from PyQt5.QtCore import QBuffer
 from PyQt5.QtCore import QByteArray
@@ -9,8 +8,10 @@ from PyQt5.QtCore import QMimeData
 from PyQt5.QtWidgets import QApplication
 from quamash import QEventLoop
 
+import log
 
-logger = logging.getLogger(__name__)
+
+logger = log.getLogger(__name__)
 
 
 # TODO: rename this to QtClipboard?
@@ -44,7 +45,7 @@ class LinuxClipboard:
         def when_clipboard_changes():
             mime_data = self._qt_clipboard.mimeData()
             clipboard_contents = QMimeDataSerializer.serialize(mime_data)
-            logger.debug("linux clipboard changed, updating")
+            logger.debug(f'detected change {log.format_obj(clipboard_contents)}')
             asyncio.ensure_future(callback(clipboard_contents),
                                   loop=self._event_loop)
             # TODO: i just copy and pasted the above from stack overflow. why
@@ -55,20 +56,19 @@ class LinuxClipboard:
 
 class QMimeDataSerializer:
 
+    WORKING_NON_IMAGE_FORMATS = set(['text/plain'])
+
     @classmethod
     def serialize(cls, qmimedata):
         # the normal case
         if not qmimedata.hasImage():
             formats = qmimedata.formats()
-            return {format: qmimedata.data(format).data() for format in formats}
-
-        # we have to special case images because the same image is available in
-        # many different formats. if we were to use them all, we would send
-        # over the image several times instead of just once
-
-        # TODO: see if this can be something other than png. i think it'll suck
-        # to send huge jpegs over the wire as png
-        return {'image/png': cls._extract_image(qmimedata)}
+            compatible_formats = cls.WORKING_NON_IMAGE_FORMATS.intersection(formats)
+            return {format: qmimedata.data(format).data() for format in compatible_formats}
+        else:
+            # TODO: see if this can be something other than png. i think it'll suck
+            # to send huge jpegs over the wire as png
+            return {'image/png': cls._extract_image(qmimedata)}
 
     @classmethod
     def deserialize(cls, serialized):

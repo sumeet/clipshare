@@ -1,20 +1,19 @@
 from asyncio import ensure_future
 import asyncio
-import logging
 import os
 import threading
 import time
 
-import coloredlogs
 import websockets
 
 from local_clipboard import LocalClipboard
+import log
 from relay import Relay
 from websocket import MAX_PAYLOAD_SIZE
 from websocket import WebsocketHandler
 
 
-logger = logging.getLogger(__name__)
+logger = log.getLogger(__name__)
 
 
 RECONNECT_WAIT_SECONDS = 5
@@ -53,8 +52,6 @@ def start_client():
 
 
 if __name__ == '__main__':
-    coloredlogs.install(level='DEBUG')
-
     while True:
         try:
             start_client()
