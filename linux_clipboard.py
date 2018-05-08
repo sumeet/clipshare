@@ -23,6 +23,7 @@ class LinuxClipboard:
     @classmethod
     def new(cls):
         # lol, move this somewhere better
+        # XXX: ugh i forgot what this is for
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         app = QApplication([])
         loop = QEventLoop(app)
