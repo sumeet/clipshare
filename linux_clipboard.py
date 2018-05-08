@@ -48,9 +48,6 @@ class LinuxClipboard:
             logger.debug(f'detected change {log.format_obj(clipboard_contents)}')
             asyncio.ensure_future(callback(clipboard_contents),
                                   loop=self._event_loop)
-            # TODO: i just copy and pasted the above from stack overflow. why
-            # do i need to do the above, and why can't i just do the below?
-            #await callback(clipboard_contents)
         self._qt_clipboard.dataChanged.connect(when_clipboard_changes)
 
     def __repr__(self):
