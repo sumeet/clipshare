@@ -53,6 +53,9 @@ class LinuxClipboard:
             #await callback(clipboard_contents)
         self._qt_clipboard.dataChanged.connect(when_clipboard_changes)
 
+    def __repr__(self):
+        return f'<{type(self).__name__}>'
+
 
 class QMimeDataSerializer:
 

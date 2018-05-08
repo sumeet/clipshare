@@ -25,3 +25,6 @@ class RemoteClipboard:
             return callback(deserialized)
 
         self._sock.callback = message_handler
+
+    def __repr__(self):
+        return f'<{type(self).__name__}: {self._sock.connection_details}>'

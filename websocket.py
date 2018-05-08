@@ -46,3 +46,7 @@ class Sock:
     @callback.setter
     def callback(self, callback):
         self._callback = callback
+
+    @property
+    def connection_details(self):
+        return f'{self._websocket.host}:{self._websocket.port}'

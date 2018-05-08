@@ -72,6 +72,9 @@ class MacClipboard:
         image_types = (t for t in clipboard_contents if t.startswith('image'))
         return next(image_types, None)
 
+    def __repr__(self):
+        return f'<{type(self).__name__}>'
+
 
 class Poller:
 

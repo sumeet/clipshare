@@ -74,7 +74,7 @@ class ClipboardThatOnlyUpdatesOnChanges:
     # this is the clipboard that ends up getting logged, so let's just stick
     # the logging code in here
     def __repr__(self):
-        return f'<{type(self._clipboard).__name__}>'
+        return repr(self._clipboard)
 
 
 def generate_checksum(clipboard_contents):
