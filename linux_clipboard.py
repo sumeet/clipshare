@@ -46,6 +46,9 @@ class LinuxClipboard:
             mime_data = self._qt_clipboard.mimeData()
             clipboard_contents = QMimeDataSerializer.serialize(mime_data)
             logger.debug(f'detected change {log.format_obj(clipboard_contents)}')
+            if not clipboard_contents:
+                logger.debug('nothing to update, backing out')
+                return
             asyncio.ensure_future(callback(clipboard_contents),
                                   loop=self._event_loop)
         self._qt_clipboard.dataChanged.connect(when_clipboard_changes)
@@ -60,15 +63,13 @@ class QMimeDataSerializer:
 
     @classmethod
     def serialize(cls, qmimedata):
-        # the normal case
-        if not qmimedata.hasImage():
-            formats = qmimedata.formats()
-            compatible_formats = cls.WORKING_NON_IMAGE_FORMATS.intersection(formats)
-            return {format: qmimedata.data(format).data() for format in compatible_formats}
-        else:
+        if qmimedata.hasImage():
             # TODO: see if this can be something other than png. i think it'll suck
             # to send huge jpegs over the wire as png
             return {'image/png': cls._extract_image(qmimedata)}
+        formats = qmimedata.formats()
+        compatible_formats = cls.WORKING_NON_IMAGE_FORMATS.intersection(formats)
+        return {format: qmimedata.data(format).data() for format in compatible_formats}
 
     @classmethod
     def deserialize(cls, serialized):
