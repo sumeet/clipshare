@@ -39,6 +39,15 @@ class Relay:
 
     async def on_update(self, changed_clipboard, contents):
         all_other_clipboards = self._get_clipboards_other_than(changed_clipboard)
+
+        # XXX WTF: the weird thing is that, some clipboards which i haven't
+        # totally narrowed down yet. i think linux and mac are doing it, but also
+        # we seem to get some WS messages that are empty. i think for now i can hack
+        # around the issue and just discard empty contents here.
+        if not contents:
+            logger.debug(f'blocking empty contents from {repr(changed_clipboard)}')
+            return
+
         for clipboard in all_other_clipboards:
             logger.debug(f'sending update to {repr(clipboard)} {log.format_obj(contents)}')
             await clipboard.update(contents)
