@@ -24,6 +24,7 @@ class MacClipboard:
     def __init__(self, event_loop, ns_pasteboard):
         self._event_loop = event_loop
         self._ns_pasteboard = ns_pasteboard
+        self._poller = Poller(self._ns_pasteboard)
 
     @property
     def event_loop(self):
@@ -35,10 +36,23 @@ class MacClipboard:
             all_types = repr(clipboard_contents.keys())
             logger.debug('unsupported clipboard payload ' +
                          log.format_obj(clipboard_contents))
-        # XXX: why do i need to clear before writing?
-        #      looks like writing doesn't work unless i clear first
-        self._ns_pasteboard.clearContents()
-        self._ns_pasteboard.writeObjects_(NSArray.arrayWithObject_(object_to_set))
+
+        try:
+            # pause the poller while we write to it, so we don't detect our own
+            # changes
+            self._poller.pause_polling()
+
+            # for some reason you've gotta clear before writing or the write doesn't
+            # have any effect
+            self._ns_pasteboard.clearContents()
+            self._ns_pasteboard.writeObjects_(
+                NSArray.arrayWithObject_(object_to_set))
+
+            # tell the poller to ignore the change we just made,
+            self._poller.ignore_change_count(self._poller.current_change_count)
+        finally:
+            # and then when it resumes, it won't detect that change
+            self._poller.resume_polling()
 
     # by default the callback doesn't do anything. it has to be set by the
     # relay. this should be overwritten by the caller
@@ -49,13 +63,13 @@ class MacClipboard:
         asyncio.ensure_future(self.poll_forever(), loop=self._event_loop)
 
     async def poll_forever(self):
-        poller = Poller(self._ns_pasteboard)
-
         while True:
-            clipboard_contents = poller.poll_for_new_clipboard_contents()
+            clipboard_contents = self._poller.poll_for_new_clipboard_contents()
             if clipboard_contents:
-                logger.debug('detected change ' + log.format_obj(clipboard_contents))
+                logger.debug(f'detected change {self._poller.current_change_count} '
+                             + log.format_obj(clipboard_contents))
                 await self._callback(clipboard_contents)
+
             await asyncio.sleep(CLIPBOARD_POLL_INTERVAL_SECONDS)
 
     def _extract_settable_nsobject(self, clipboard_contents):
@@ -82,16 +96,44 @@ class Poller:
 
     def __init__(self, ns_pasteboard):
         self._ns_pasteboard = ns_pasteboard
-        self._change_count = self._get_change_count()
+        self._last_seen_change_count = self.current_change_count
+        self._paused = False
+        self._change_count_to_ignore = None
+
+    @property
+    def current_change_count(self):
+        return self._ns_pasteboard.changeCount()
 
     def poll_for_new_clipboard_contents(self):
-        new_change_count = self._get_change_count()
-        if new_change_count != self._change_count:
-            self._change_count = new_change_count
-            return extract_clipboard_contents(self._ns_pasteboard)
+        if self._paused:
+            return None
 
-    def _get_change_count(self):
-        return self._ns_pasteboard.changeCount()
+        current_change_count = self.current_change_count
+        # if the change count hasn't changed, the clipboard contents haven't
+        # changed
+        if current_change_count == self._last_seen_change_count:
+            return None
+
+        self._last_seen_change_count = current_change_count
+
+        # this logic prevents us from propagating our own clipboard updates.
+        # immediately after setting the clipboard, we tell ourselves to ignore that
+        # update
+        if current_change_count == self._change_count_to_ignore:
+            logger.debug('ignoring bc we told ourselves to ignore '
+                         f'{current_change_count}')
+            return None
+
+        return extract_clipboard_contents(self._ns_pasteboard)
+
+    def pause_polling(self):
+        self._paused = True
+
+    def resume_polling(self):
+        self._paused = False
+
+    def ignore_change_count(self, change_count_to_ignore):
+        self._change_count_to_ignore = change_count_to_ignore
 
 
 MIME_TYPE_BY_READABLE_TYPE = {'public.tiff': 'image/tiff',
