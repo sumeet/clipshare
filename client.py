@@ -23,7 +23,7 @@ KEEPALIVE_INTERVAL_SECONDS = 30
 
 
 # when running clipshare behind nginx, the server and client would seem to get
-# disconnected frequently. at least on dokku's settings. add thing keepalive
+# disconnected frequently. at least on dokku's settings. adding this keepalive
 # fixes the problem there. it's probably good to keep this in here. i bet it'll
 # help with other configurations as well.
 async def keepalive_forever(websocket, interval_seconds):
