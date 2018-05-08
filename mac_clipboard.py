@@ -33,10 +33,12 @@ class MacClipboard:
         object_to_set = self._extract_settable_nsobject(clipboard_contents)
         if not object_to_set:
             all_types = repr(clipboard_contents.keys())
-            logger.debug('unsupported clipboard payload ' + log.format_obj(clipboard_contents))
+            logger.debug('unsupported clipboard payload ' +
+                         log.format_obj(clipboard_contents))
+        # XXX: why do i need to clear before writing?
+        #      looks like writing doesn't work unless i clear first
         self._ns_pasteboard.clearContents()
         self._ns_pasteboard.writeObjects_(NSArray.arrayWithObject_(object_to_set))
-        self._ns_pasteboard.release()
 
     # by default the callback doesn't do anything. it has to be set by the
     # relay. this should be overwritten by the caller
