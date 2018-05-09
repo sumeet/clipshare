@@ -2,4 +2,4 @@ pyqt5; sys_platform == 'linux'
 quamash; sys_platform == 'linux'
 pyobjc; sys_platform == 'darwin'
 websockets
-coloredlogs
+Pillow

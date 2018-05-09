@@ -9,12 +9,13 @@ from PyQt5.QtWidgets import QApplication
 from quamash import QEventLoop
 
 import log
+from image import convert_to_png
 
 
 logger = log.getLogger(__name__)
 
 
-# TODO: rename this to QtClipboard?
+# TODO: rename this to QtClipboard? maybe it works with windows :P
 class LinuxClipboard:
 
     # XXX: this interface seems a bit strange. we're creating a clipboard
@@ -38,6 +39,7 @@ class LinuxClipboard:
         return self._event_loop
 
     async def update(self, clipboard_contents):
+        convert_tif_to_png_to_fix_pasting_in_google_chrome_linux(clipboard_contents)
         qmimedata_to_set = QMimeDataSerializer.deserialize(
             clipboard_contents)
         self._qt_clipboard.setMimeData(qmimedata_to_set)
@@ -86,6 +88,19 @@ class QMimeDataSerializer:
         buffer.open(QIODevice.WriteOnly)
         qmimedata.imageData().save(buffer, 'PNG')
         return ba.data()
+
+
+# os x sends tiffs, pretty much always, and if we set a TIFF into the linux
+# clipboard, it pretty much works! except google chrome can't paste it. and i
+# need to paste into google chrome. so let's just do this conversion here. the
+# cool thing is that PNGs seem to be smaller than TIFFs usually. hmmmmmm,
+#
+# TODO maybe i should just do this OS X side, because it shrinks the file size
+# anyway, because of the lossless compression i suppose
+def convert_tif_to_png_to_fix_pasting_in_google_chrome_linux(clipboard_contents):
+    if 'image/tiff' in clipboard_contents:
+        tiff_data = clipboard_contents.pop('image/tiff')
+        clipboard_contents['image/png'] = convert_to_png(tiff_data)
 
 
 if __name__ == '__main__':
