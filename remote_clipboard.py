@@ -1,13 +1,21 @@
+from collections import namedtuple
 from io import BytesIO
 import pickle           # lol it works
 
 import log
+import signals
 
 
 logger = log.getLogger(__name__)
 
 
-MSG_SPLIT_SIZE = 500_000    # bytes
+# don't send an entire clipboard payload to the server in a single websocket
+# message. the reason being, we can't measure progress if all the data is sent
+# in a single message. we want to show a progress bar. split it into chunks so
+# we know how much we sent, and how much is remaining to send
+#
+# TODO: tune this value by measuring transfer speed time
+MSG_SPLIT_SIZE = 500_000
 
 
 class RemoteClipboard:
@@ -19,19 +27,36 @@ class RemoteClipboard:
     async def update(self, clipboard_contents):
         full_output = pickle.dumps(clipboard_contents)
 
-        for chunk in split_message(full_output, MSG_SPLIT_SIZE):
+        # XXX: idk about this bc it uses a lot of memory that i wasn't before
+        chunks = list(split_message(full_output, MSG_SPLIT_SIZE))
+
+        progress = TransferProgress(total=len(chunks), completed=0)
+        signals.outgoing_transfer.send(progress)
+
+        for chunk in chunks:
             await self._sock.send_message(chunk)
+            progress = progress.increment_completion_by_one
+            signals.outgoing_transfer.send(progress)
 
     def set_callback_for_updates(self, callback):
         async def message_handler(msg):
+            # TODO: make this for real
+            progress = TransferProgress(total=1, completed=0)
+            signals.incoming_transfer.send(progress)
+
             maybe_full_msg = self._message_rejoiner.process_incoming_part(msg)
+
             if maybe_full_msg:
+                # TODO: make this for real as well
+                progress = TransferProgress(total=1, completed=1)
+                signals.incoming_transfer.send(progress)
                 try:
                     deserialized = pickle.loads(maybe_full_msg)
                 except:
                     log.info(f"couldn't deserialize joined msg: {maybe_full_msg}")
                     return
                 await callback(deserialized)
+
             return None
 
         self._sock.callback = message_handler
@@ -79,6 +104,17 @@ class MessageRejoiner:
 class donemarker(object):
     """signals the end of a multipart message"""
     pass
+
+
+class TransferProgress(namedtuple('TransferProgress', 'total completed')):
+
+    @property
+    def increment_completion_by_one(self):
+        return self._replace(completed=self.completed + 1)
+
+    @property
+    def is_complete(self):
+        return self.total == self.completed
 
 
 if __name__ == '__main__':

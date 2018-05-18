@@ -1,5 +1,11 @@
-pyqt5; sys_platform == 'linux'
-quamash; sys_platform == 'linux'
+# qt5 used for both mac and linux
+#
+# for linux, qt5 handles both the gui and clipboard
+# TODO: maybe there's a way to get pyqt5 to only install for the client, and not the server?
+pyqt5
+quamash     # qt event loop for asyncio
+# for os x, we use pyobjc for the clipboard and qt5 for the gui
 pyobjc; sys_platform == 'darwin'
 websockets
 Pillow
+blinker

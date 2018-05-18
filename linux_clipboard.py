@@ -5,8 +5,6 @@ from PyQt5.QtCore import QBuffer
 from PyQt5.QtCore import QByteArray
 from PyQt5.QtCore import QIODevice
 from PyQt5.QtCore import QMimeData
-from PyQt5.QtWidgets import QApplication
-from quamash import QEventLoop
 
 import log
 from image import convert_to_png
@@ -18,30 +16,16 @@ logger = log.getLogger(__name__)
 # TODO: rename this to QtClipboard? maybe it works with windows :P
 class LinuxClipboard:
 
-    # XXX: this interface seems a bit strange. we're creating a clipboard
-    # object and right there we're also creating the event loop. it works for
-    # now! but it might change
     @classmethod
-    def new(cls):
-        # lol, move this somewhere better
-        # XXX: ugh i forgot what this is for
-        signal.signal(signal.SIGINT, signal.SIG_DFL)
-        app = QApplication([])
-        loop = QEventLoop(app)
-        return cls(loop, app.clipboard())
+    def new(cls, qt_app):
+        return cls(qt_app.clipboard())
 
-    def __init__(self, event_loop, qt_clipboard):
-        self._event_loop = event_loop
+    def __init__(self, qt_clipboard):
         self._qt_clipboard = qt_clipboard
-
-    @property
-    def event_loop(self):
-        return self._event_loop
 
     async def update(self, clipboard_contents):
         convert_tif_to_png_to_fix_pasting_in_google_chrome_linux(clipboard_contents)
-        qmimedata_to_set = QMimeDataSerializer.deserialize(
-            clipboard_contents)
+        qmimedata_to_set = QMimeDataSerializer.deserialize(clipboard_contents)
         self._qt_clipboard.setMimeData(qmimedata_to_set)
 
     def set_callback_for_updates(self, callback):
@@ -49,12 +33,14 @@ class LinuxClipboard:
             mime_data = self._qt_clipboard.mimeData()
             clipboard_contents = QMimeDataSerializer.serialize(mime_data)
             logger.debug(f'detected change {log.format_obj(clipboard_contents)}')
-            if not clipboard_contents:
+            if not self._contains_data(clipboard_contents):
                 logger.debug('nothing to update, backing out')
                 return
-            asyncio.ensure_future(callback(clipboard_contents),
-                                  loop=self._event_loop)
+            asyncio.ensure_future(callback(clipboard_contents))
         self._qt_clipboard.dataChanged.connect(when_clipboard_changes)
+
+    def _contains_data(self, clipboard_contents):
+        return any(clipboard_contents.values())
 
     def __repr__(self):
         return f'<{type(self).__name__}>'

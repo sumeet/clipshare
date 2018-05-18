@@ -52,12 +52,21 @@ class Highlighter:
     def format(self, record):
         logger_name = record.name
         color = self._consistent_colorer.get_color_for(logger_name)
-        return self._padding + f'{self._format_time(record)} {colorize(color, logger_name)} {record.getMessage()}'
+        return (f'{self._padding}{self._format_time(record)} '
+                f'{colorize(color, logger_name)} {self._format_body(record)}')
+
+    def _format_body(self, record):
+        return (self._format_exception(record.exc_info) if record.exc_info else
+                record.getMessage())
 
     def _format_time(self, record):
         ct = time.localtime(record.created)
         t = time.strftime('%H:%M:%S', ct)
         return '%s,%03d' % (t, record.msecs)
+
+    def _format_exception(self, exc_info):
+        formatter = logging.Formatter()
+        return f'Encountered an exception:\n{formatter.formatException(exc_info)}'
 
     @property
     def _padding(self):
@@ -67,6 +76,7 @@ class Highlighter:
             return '\n' * 2
         else:
             return ''
+
 
 handler = logging.StreamHandler(stream=sys.stderr)
 handler.setFormatter(Highlighter())

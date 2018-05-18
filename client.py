@@ -1,14 +1,19 @@
 from asyncio import ensure_future
 import asyncio
 import os
+import signal
 import threading
 import time
 
+from PyQt5.QtWidgets import QApplication
+from quamash import QEventLoop
 import websockets
 
 from local_clipboard import LocalClipboard
 import log
 from relay import Relay
+import signals
+from ui import UI
 from websocket import MAX_PAYLOAD_SIZE
 from websocket import WebsocketHandler
 
@@ -38,25 +43,39 @@ async def client(websocket_handler, url):
         await websocket_handler.handle(websocket, 'the path is ignored anyway')
 
 
-def start_client():
+def start_client(qapp):
+    # do this first because the rest of the proggy depnds on this being established
+    # as the event loop
+    event_loop = QEventLoop(qapp)
+    asyncio.set_event_loop(event_loop)
+
     relay = Relay()
 
-    local_clipboard = LocalClipboard.new()
+    local_clipboard = LocalClipboard.new(qapp)
     relay.add_clipboard(local_clipboard)
 
     websocket_handler = WebsocketHandler(relay)
+
+    ui = UI(qapp)
+    signals.incoming_transfer.connect(ui.handle_incoming_transfer_progress)
+    signals.outgoing_transfer.connect(ui.handle_outgoing_transfer_progress)
+
     c = client(websocket_handler, WS_URL)
 
-    asyncio.set_event_loop(local_clipboard.event_loop)
-    local_clipboard.event_loop.run_until_complete(c)
+    with event_loop:
+        # we need this to make it so ^c will quit the program
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        event_loop.run_until_complete(c)
 
 
 if __name__ == '__main__':
+    qapp = QApplication([])
+
     while True:
         try:
-            start_client()
+            start_client(qapp)
         except Exception as e:
             logger.info('got disconnected from the server')
-            logger.debug(e)
+            logger.exception(e)
             logger.info(f'waiting {RECONNECT_WAIT_SECONDS} before reconnecting')
             time.sleep(RECONNECT_WAIT_SECONDS)

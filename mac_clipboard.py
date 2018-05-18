@@ -17,18 +17,13 @@ CLIPBOARD_POLL_INTERVAL_SECONDS = 0.5
 class MacClipboard:
 
     @classmethod
-    def new(cls):
-        # just use the default asyncio event loop
-        return cls(asyncio.get_event_loop(), NSPasteboard.generalPasteboard())
+    def new(cls, qt_app):
+        # we don't use qt to read for the mac clipboard, for now
+        return cls(NSPasteboard.generalPasteboard())
 
-    def __init__(self, event_loop, ns_pasteboard):
-        self._event_loop = event_loop
+    def __init__(self, ns_pasteboard):
         self._ns_pasteboard = ns_pasteboard
         self._poller = Poller(self._ns_pasteboard)
-
-    @property
-    def event_loop(self):
-        return self._event_loop
 
     async def update(self, clipboard_contents):
         object_to_set = self._extract_settable_nsobject(clipboard_contents)
@@ -60,7 +55,7 @@ class MacClipboard:
 
     def set_callback_for_updates(self, callback):
         self._callback = callback
-        asyncio.ensure_future(self.poll_forever(), loop=self._event_loop)
+        asyncio.ensure_future(self.poll_forever())
 
     async def poll_forever(self):
         while True:
