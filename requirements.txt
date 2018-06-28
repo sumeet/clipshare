@@ -6,6 +6,6 @@ pyqt5
 quamash     # qt event loop for asyncio
 # for os x, we use pyobjc for the clipboard and qt5 for the gui
 pyobjc; sys_platform == 'darwin'
-websockets
+websockets==5.0.1
 Pillow
 blinker
