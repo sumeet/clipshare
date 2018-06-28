@@ -12,6 +12,11 @@ logger = log.getLogger(__name__)
 
 
 CLIPBOARD_POLL_INTERVAL_SECONDS = 0.5
+# this is a total stab in the dark. for some reason, sometimes reading an
+# image from the mac clipboard has a problem, where you copy something, and it
+# appears to return null data. i'm having trouble reproducing it. this is here
+# in the event that this actually works.
+NS_PASTEBOARD_RETRY_COUNT = 3
 
 
 class MacClipboard:
@@ -141,5 +146,21 @@ def extract_clipboard_contents(ns_pasteboard):
     mime_type = MIME_TYPE_BY_READABLE_TYPE.get(data_type)
     if not mime_type:
         return None
-    clipboard_data = bytes(ns_pasteboard.dataForType_(data_type))
+
+    retries_remaining = NS_PASTEBOARD_RETRY_COUNT
+    while retries_remaining:
+        ns_pasteboard_data = ns_pasteboard.dataForType_(data_type)
+        if ns_pasteboard_data:
+            break
+        else:
+            logger.debug(f'failed querying NSPasteboard for type {mime_type}, '
+                         'retrying')
+            retries_remaining -= 1
+    else:
+        # if we ran out of retries, then just give up
+        #
+        # TODO: maybe show the user an error if this happens?
+        return None
+
+    clipboard_data = bytes(ns_pasteboard_data)
     return {mime_type: clipboard_data}
