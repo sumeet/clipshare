@@ -72,12 +72,13 @@ def start_client(qapp):
     c = client(websocket_handler, WS_URL)
 
     with event_loop:
-        # we need this to make it so ^c will quit the program
-        signal.signal(signal.SIGINT, signal.SIG_DFL)
         event_loop.run_until_complete(c)
 
 
 if __name__ == '__main__':
+    # we need this to make it so ^c will quit the program
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
     while True:
         try:
             qapp = QApplication([])
