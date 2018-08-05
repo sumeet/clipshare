@@ -78,13 +78,14 @@ def start_client(qapp):
 
 
 if __name__ == '__main__':
-    qapp = QApplication([])
-
     while True:
         try:
+            qapp = QApplication([])
             start_client(qapp)
         except Exception as e:
             logger.info('got disconnected from the server')
             logger.exception(e)
             logger.info(f'waiting {RECONNECT_WAIT_SECONDS} before reconnecting')
             time.sleep(RECONNECT_WAIT_SECONDS)
+        finally:
+            qapp.quit()
