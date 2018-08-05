@@ -39,8 +39,11 @@ async def keepalive_forever(websocket, interval_seconds):
 
 async def client(websocket_handler, url):
     async with websockets.connect(url,  max_size=MAX_PAYLOAD_SIZE) as websocket:
+        signals.connection_established.send()
+
         ensure_future(keepalive_forever(websocket, KEEPALIVE_INTERVAL_SECONDS))
-        await websocket_handler.handle(websocket, 'the path is ignored anyway')
+        await websocket_handler.handle(websocket,
+                                       'the path is only used for servers')
 
 
 class Connection:
@@ -51,24 +54,29 @@ class Connection:
         self._client_future = None
 
     def connect(self):
-        if self._is_connection_active:
+        if self.is_active:
             raise Exception('fatal error: client running, but tried to start')
+
+        signals.connection_connecting.send()
 
         c = client(self._websocket_handler, self._ws_url)
         self._client_future = ensure_future(c)
         self._client_future.add_done_callback(self._client_future_done)
 
     def disconnect(self):
-        if self._is_connection_active:
+        logger.info('requested disconnect: disconnecting from server')
+        if self.is_active:
             self._client_future.cancel()
 
     # XXX: this doesn't neccessarily mean we're connected to the server. it
     # could mean we're still trying to establish a connection
     @property
-    def _is_connection_active(self):
+    def is_active(self):
         return self._client_future and not self._client_future.done()
 
     def _client_future_done(self, client_future):
+        signals.connection_disconnected.send()
+
         if client_future.cancelled():
             # if cancelled, that means WE cancelled it. don't reconnect
             return
@@ -84,10 +92,14 @@ class Connection:
         self.connect()
 
 
-def start_ui(qapp):
-    ui = UI(qapp)
+def start_ui(qapp, connection):
+    ui = UI(qapp, connection)
     signals.incoming_transfer.connect(ui.handle_incoming_transfer_progress)
     signals.outgoing_transfer.connect(ui.handle_outgoing_transfer_progress)
+
+    signals.connection_established.connect(ui.handle_connection_established)
+    signals.connection_connecting.connect(ui.handle_connection_connecting)
+    signals.connection_disconnected.connect(ui.handle_connection_disconnected)
     ui.start()
     return ui
 
@@ -110,10 +122,10 @@ if __name__ == '__main__':
 
     websocket_handler = WebsocketHandler(relay)
 
-    ui = start_ui(qapp)
-
     connection = Connection(relay, WS_URL)
     connection.connect()
+
+    ui = start_ui(qapp, connection)
 
     with event_loop:
         event_loop.run_forever()

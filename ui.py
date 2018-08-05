@@ -1,9 +1,11 @@
 import asyncio
 import os.path
+import sys
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QCursor
 from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QMenu
 from PyQt5.QtWidgets import QProgressDialog
 from PyQt5.QtWidgets import QSystemTrayIcon
 
@@ -18,13 +20,25 @@ logger = log.getLogger(__name__)
 
 class UI:
 
-    def __init__(self, qapp):
+    def __init__(self, qapp, connection):
         self._qapp = qapp
-        self._tray = Tray()
+        self._tray = Tray(connection)
         self._progress_window = ProgressWindow(qapp)
 
     def start(self):
-        self._tray.show()
+        self._tray.start()
+
+    # XXX: the connection signals don't have send any args, but for some reason
+    # blinker sends a None that causes an ArgumentError unless we just accept
+    # it
+    def handle_connection_established(self, *args):
+        self._tray.handle_connection_established()
+
+    def handle_connection_connecting(self, *args):
+        self._tray.handle_connection_connecting()
+
+    def handle_connection_disconnected(self, *args):
+        self._tray.handle_connection_disconnected()
 
     def handle_incoming_transfer_progress(self, progress):
         self._progress_window.handle_incoming_transfer_progress(progress)
@@ -38,38 +52,95 @@ class UI:
 # XXX: pry move tray and progress window into separate files
 class Tray:
 
-    def __init__(self):
+    RESET_ACTIVITY_INDICATOR_AFTER_SECONDS = 30
+
+    def __init__(self, connection):
+        self._connection = connection
+
         self._qsystem_tray_icon = QSystemTrayIcon()
         self._icons = Icons()
-        self._reset_tray_timer = ResetTrayTimer(self)
-        self.set_icon_to_normal()
+        self._scheduler = Scheduler()
+        self.set_icon(self._icons.disconnected)
+        self._rebuild_menu()
+
+    def start(self):
+        # on mac, left clicking on a tray icon will both "activate" it, and
+        # open up the context menu. on other platforms, we'll allow you to
+        # easily turn off syncing by just clicking the menu icon. on mac you'll
+        # have to go into the context menu.
+        if sys.platform != 'darwin':
+            self._qsystem_tray_icon.activated.connect(self._tray_icon_clicked)
+        self._qsystem_tray_icon.show()
+
+    def handle_connection_established(self):
+        self.set_icon(self._icons.connected)
+        self._rebuild_menu()
+
+    def handle_connection_connecting(self):
+        self.set_icon(self._icons.connecting)
+        self._rebuild_menu()
+
+    def handle_connection_disconnected(self):
+        self.set_icon(self._icons.disconnected)
+        self._rebuild_menu()
 
     def handle_incoming_transfer_progress(self, transfer_progress):
         if transfer_progress.is_complete:
-            self._set_icon(self._icons.recently_received_from_remote)
-            self._reset_tray_timer.start_timer_to_reset_tray_back_to_normal()
+            self.set_icon(self._icons.recently_received_from_remote)
+            self._schedule_activity_indicator_to_go_back_to_normal()
         else:
-            self._set_icon(self._icons.downloading)
+            self.set_icon(self._icons.downloading)
 
     def handle_outgoing_transfer_progress(self, transfer_progress):
         if transfer_progress.is_complete:
-            self._set_icon(self._icons.recently_sent_to_remote)
-            self._reset_tray_timer.start_timer_to_reset_tray_back_to_normal()
+            self.set_icon(self._icons.recently_sent_to_remote)
+            self._schedule_activity_indicator_to_go_back_to_normal()
         else:
-            self._set_icon(self._icons.uploading)
+            self.set_icon(self._icons.uploading)
 
-    def set_icon_to_normal(self):
-        self._set_icon(self._icons.normal)
-
-    def show(self):
-        self._qsystem_tray_icon.show()
-
-    def _set_icon(self, icon):
+    def set_icon(self, icon):
         self._qsystem_tray_icon.setIcon(icon)
 
+    # changing of the connection state could cause some of the menu options to
+    # change. for example, if we're connected, then we want to show the user an
+    # option to pause, and the other way around. so we will want to rebuild
+    # often
+    def _rebuild_menu(self):
+        menu = QMenu()
+        self._add_pause_menu_action(menu)
+        self._qsystem_tray_icon.setContextMenu(menu)
 
-class ResetTrayTimer:
-    """Resets the tray icon back to `normal` if there hasn't been any clipboard
+    def _add_pause_menu_action(self, menu):
+        if self._connection.is_active:
+            paused_action = menu.addAction('Pause clipboard syncing')
+            paused_action.triggered.connect(self._connection.disconnect)
+        else:
+            paused_action = menu.addAction('Connect to remote clipboard')
+            paused_action.triggered.connect(self._connection.connect)
+
+    def _schedule_activity_indicator_to_go_back_to_normal(self):
+        self._scheduler.schedule_task(
+            lambda self: self.set_icon(self._icons.connected),
+            timeout=self.RESET_ACTIVITY_INDICATOR_AFTER_SECONDS)
+
+    def _tray_icon_clicked(self, reason):
+        if reason == QSystemTrayIcon.Trigger:
+            self._toggle_pause()
+
+    def _toggle_pause(self):
+        if self._connection.is_active:
+            self._connection.disconnect()
+        else:
+            self._connection.connect()
+
+
+class Scheduler:
+    """Scheduler which schedules a task for the future. If you try to schedule
+    something else, cancels the scheduled task if it's still pending.
+
+    It's used for:
+
+    Resets the tray icon back to `normal` if there hasn't been any clipboard
     activity for a while.
 
     Normally when you copy something to the clipboard, you paste it right away.
@@ -81,37 +152,33 @@ class ResetTrayTimer:
     indicator-less icon.
     """
 
-    RESET_IN_SECONDS = 30
-
-    def __init__(self, tray):
-        self._tray = tray
+    def __init__(self):
         self._task = None
 
-    def start_timer_to_reset_tray_back_to_normal(self):
+    def schedule_task(self, func, *, timeout):
         if self._task and not self._task.done():
             logger.debug("there's already a timer running, cancelling it")
             self._task.cancel()
-        self._task = asyncio.ensure_future(
-            self._wait_then_set_tray_back_to_normal())
+        future = self._wait_then_execute_task(func, timeout)
+        self._task = asyncio.ensure_future(future)
 
-
-    async def _wait_then_set_tray_back_to_normal(self):
-        logger.debug('starting timer to reset tray back to normal')
-        await asyncio.sleep(self.RESET_IN_SECONDS)
-        logger.debug('done waiting on timer, resetting tray icon')
-        self._tray.set_icon_to_normal()
+    async def _wait_then_execute_task(self, func, timeout):
+        await asyncio.sleep(timeout)
+        self._tray.set_icon(icons.connected)
 
 
 class Icons:
 
     def __init__(self):
-        self.normal = self._icon('002-clipboard.png')
-        self.recently_sent_to_remote = self._icon('001-list.png')
-        self.recently_received_from_remote = self._icon('008-miscellaneous-4.png')
-        self.uploading = self._icon('003-miscellaneous.png')
-        self.downloading = self._icon('004-miscellaneous-1.png')
+        self.disconnected = self._load('009-verification.png')
+        self.connecting = self._load('010-logistics.png')
+        self.connected = self._load('002-clipboard.png')
+        self.recently_sent_to_remote = self._load('001-list.png')
+        self.recently_received_from_remote = self._load('008-miscellaneous-4.png')
+        self.uploading = self._load('003-miscellaneous.png')
+        self.downloading = self._load('004-miscellaneous-1.png')
 
-    def _icon(self, filename):
+    def _load(self, filename):
         # XXX: for some reason, QIcon doesn't crash if the file doesn't exist.
         path_to_icon = os.path.join(DIR_PATH, 'coloredicons', 'png', filename)
         if not os.path.exists(path_to_icon):
