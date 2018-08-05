@@ -16,6 +16,25 @@ DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 logger = log.getLogger(__name__)
 
 
+class UI:
+
+    def __init__(self, qapp):
+        self._qapp = qapp
+        self._tray = Tray()
+        self._progress_window = ProgressWindow(qapp)
+
+    def start(self):
+        self._tray.show()
+
+    def handle_incoming_transfer_progress(self, progress):
+        self._progress_window.handle_incoming_transfer_progress(progress)
+        self._tray.handle_incoming_transfer_progress(progress)
+
+    def handle_outgoing_transfer_progress(self, progress):
+        self._progress_window.handle_outgoing_transfer_progress(progress)
+        self._tray.handle_outgoing_transfer_progress(progress)
+
+
 # XXX: pry move tray and progress window into separate files
 class Tray:
 

@@ -13,7 +13,7 @@ from local_clipboard import LocalClipboard
 import log
 from relay import Relay
 import signals
-import ui
+from ui import UI
 from websocket import MAX_PAYLOAD_SIZE
 from websocket import WebsocketHandler
 
@@ -56,18 +56,10 @@ def start_client(qapp):
 
     websocket_handler = WebsocketHandler(relay)
 
-    # DESIGN: single UI object that delegates down to ProgressWindow and Tray?
-    progress_window = ui.ProgressWindow(qapp)
-    signals.incoming_transfer.connect(
-        progress_window.handle_incoming_transfer_progress)
-    signals.outgoing_transfer.connect(
-        progress_window.handle_outgoing_transfer_progress)
-
-    tray = ui.Tray()
-    tray.show()
-
-    signals.incoming_transfer.connect(tray.handle_incoming_transfer_progress)
-    signals.outgoing_transfer.connect(tray.handle_outgoing_transfer_progress)
+    ui = UI(qapp)
+    signals.incoming_transfer.connect(ui.handle_incoming_transfer_progress)
+    signals.outgoing_transfer.connect(ui.handle_outgoing_transfer_progress)
+    ui.start()
 
     c = client(websocket_handler, WS_URL)
 
