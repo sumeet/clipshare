@@ -21,8 +21,7 @@ logger = log.getLogger(__name__)
 class UI:
 
     def __init__(self, qapp, connection):
-        self._qapp = qapp
-        self._tray = Tray(connection)
+        self._tray = Tray(qapp, connection)
         self._progress_window = ProgressWindow(qapp)
 
     def start(self):
@@ -54,7 +53,8 @@ class Tray:
 
     RESET_ACTIVITY_INDICATOR_AFTER_SECONDS = 30
 
-    def __init__(self, connection):
+    def __init__(self, qapp, connection):
+        self._qapp = qapp
         self._connection = connection
 
         self._qsystem_tray_icon = QSystemTrayIcon()
@@ -108,6 +108,7 @@ class Tray:
     def _rebuild_menu(self):
         menu = QMenu()
         self._add_pause_menu_action(menu)
+        self._add_quit_menu_action(menu)
         self._qsystem_tray_icon.setContextMenu(menu)
 
     def _add_pause_menu_action(self, menu):
@@ -117,6 +118,10 @@ class Tray:
         else:
             paused_action = menu.addAction('Connect to remote clipboard')
             paused_action.triggered.connect(self._connection.connect)
+
+    def _add_quit_menu_action(self, menu):
+        quit_action = menu.addAction('Quit')
+        quit_action.triggered.connect(self._qapp.quit)
 
     def _schedule_activity_indicator_to_go_back_to_normal(self):
         self._scheduler.schedule_task(
