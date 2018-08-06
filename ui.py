@@ -125,7 +125,7 @@ class Tray:
 
     def _schedule_activity_indicator_to_go_back_to_normal(self):
         self._scheduler.schedule_task(
-            lambda self: self.set_icon(self._icons.connected),
+            lambda: self.set_icon(self._icons.connected),
             timeout=self.RESET_ACTIVITY_INDICATOR_AFTER_SECONDS)
 
     def _tray_icon_clicked(self, reason):
@@ -168,8 +168,10 @@ class Scheduler:
         self._task = asyncio.ensure_future(future)
 
     async def _wait_then_execute_task(self, func, timeout):
+        logger.debug(f'waiting {timeout} seconds before executing {func}')
         await asyncio.sleep(timeout)
-        self._tray.set_icon(icons.connected)
+        logger.debug(f'executing {func}')
+        func()
 
 
 class Icons:
