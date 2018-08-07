@@ -203,7 +203,7 @@ class ProgressWindow:
     def handle_incoming_transfer_progress(self, transfer_progress):
         if not self._incoming_progress_dialog:
             self._incoming_progress_dialog = self._open_dialog(
-                "Receiving from remote clipboard\u2026")
+                'Receiving from remote clipboard\u2026')
 
         if transfer_progress.is_complete:
             self._close_if_open(self._incoming_progress_dialog)
@@ -215,7 +215,7 @@ class ProgressWindow:
 
     def handle_outgoing_transfer_progress(self, transfer_progress):
         if not self._outgoing_progress_dialog:
-            self._outgoing_progress_dialog = self._open_dialog("Sending to remote clipboard\u2026")
+            self._outgoing_progress_dialog = self._open_dialog('Sending to remote clipboard\u2026')
 
         if transfer_progress.is_complete:
             self._close_if_open(self._outgoing_progress_dialog)
@@ -228,9 +228,11 @@ class ProgressWindow:
     def _open_dialog(self, progress_dialog_title):
         progress_dialog = QProgressDialog()
         progress_dialog.setWindowFlags(Qt.WindowStaysOnTopHint)
-        progress_dialog.setWindowTitle("Clipshare")
-        progress_dialog.setLabelText(progress_dialog_title)
-        progress_dialog.setWindowOpacity(0.75)
+        progress_dialog.setWindowTitle('Clipshare')
+        # XXX: for some reason, mac is clipping off the very ends of the label.
+        # let's throw in some space so the whole thing shows up
+        progress_dialog.setLabelText('    ' + progress_dialog_title + '    ')
+        progress_dialog.setWindowOpacity(0.95)
         progress_dialog.canceled.connect(progress_dialog.hide)
         progress_dialog.move(get_cursor_position(self._qapp))
         progress_dialog.show()

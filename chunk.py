@@ -58,6 +58,10 @@ class Rejoiner:
 class Chunk(namedtuple('Chunk', 'chunk_index total_chunks data message_hash')):
 
     @property
+    def is_the_first_chunk(self):
+        return self.chunk_index == 0
+
+    @property
     def is_the_last_chunk(self):
         return self.chunk_index == self.total_chunks - 1
 

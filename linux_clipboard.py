@@ -72,7 +72,10 @@ class QMimeDataSerializer:
         ba = QByteArray()
         buffer = QBuffer(ba)
         buffer.open(QIODevice.WriteOnly)
-        qmimedata.imageData().save(buffer, 'PNG')
+        image_data = qmimedata.imageData()
+        if not image_data:
+            raise ClipboardHadNoImageError(qmimedata)
+        image_data.save(buffer, 'PNG')
         return ba.data()
 
 
@@ -87,6 +90,21 @@ def convert_tif_to_png_to_fix_pasting_in_google_chrome_linux(clipboard_contents)
     if 'image/tiff' in clipboard_contents:
         tiff_data = clipboard_contents.pop('image/tiff')
         clipboard_contents['image/png'] = convert_to_png(tiff_data)
+
+
+class ClipboardHadNoImageError(Exception):
+
+    def __init__(self, qmimedata):
+        self._qmimedata = qmimedata
+
+    def __str__(self):
+        return ("Couldn't find an image in the clipboard contents: "
+                f'{self._format_clipboard_contents}')
+
+    @property
+    def _format_clipboard_contents(self):
+        return {self._qmimedata.data(format).data() for format in
+                self._qmimedata.formats()}
 
 
 if __name__ == '__main__':

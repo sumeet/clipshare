@@ -9,12 +9,6 @@ import signals
 logger = log.getLogger(__name__)
 
 
-# don't send an entire clipboard payload to the server in a single websocket
-# message. the reason being, we can't measure progress if all the data is sent
-# in a single message. we want to show a progress bar. split it into chunks so
-# we know how much we sent, and how much is remaining to send
-#
-# TODO: tune this value by measuring transfer speed time
 MSG_SPLIT_SIZE = 500_000
 
 
@@ -35,14 +29,3 @@ class RemoteClipboard:
 
     def __repr__(self):
         return f'<{type(self).__name__}: {self._sock.connection_details}>'
-
-
-class TransferProgress(namedtuple('TransferProgress', 'total completed')):
-
-    @property
-    def increment_completion_by_one(self):
-        return self._replace(completed=self.completed + 1)
-
-    @property
-    def is_complete(self):
-        return self.total == self.completed
