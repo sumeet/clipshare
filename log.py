@@ -66,6 +66,7 @@ class Highlighter:
 
     def _format_exception(self, exc_info):
         formatter = logging.Formatter()
+        print(exc_info)
         return f'Encountered an exception:\n{formatter.formatException(exc_info)}'
 
     @property

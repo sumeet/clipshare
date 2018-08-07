@@ -15,6 +15,7 @@ from relay import Relay
 import signals
 from ui import UI
 from websocket import MAX_PAYLOAD_SIZE
+from websocket import Sock
 from websocket import WebsocketHandler
 
 
@@ -49,7 +50,7 @@ async def client(websocket_handler, url):
 class Connection:
 
     def __init__(self, relay, ws_url):
-        self._websocket_handler = WebsocketHandler(relay)
+        self._websocket_handler = WebsocketHandler(relay, Sock.with_chunking)
         self._ws_url = ws_url
         self._client_future = None
 
@@ -83,7 +84,10 @@ class Connection:
         logger.info('got disconnected from the server')
         e = client_future.exception()
         if e:
-            logger.exception(e)
+            try:
+                raise e
+            except:
+                logger.exception(e)
         ensure_future(self._wait_and_reconnect())
 
     async def _wait_and_reconnect(self):
@@ -119,8 +123,6 @@ if __name__ == '__main__':
 
     local_clipboard = LocalClipboard.new(qapp)
     relay.add_clipboard(local_clipboard)
-
-    websocket_handler = WebsocketHandler(relay)
 
     connection = Connection(relay, WS_URL)
     connection.connect()

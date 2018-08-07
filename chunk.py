@@ -13,7 +13,7 @@ class Splitter:
         self._message = message
 
     @property
-    def split(self):
+    def splits(self):
         for index, data in enumerate(segment(self._message, self._split_size)):
             yield self._new_chunk(index, data)
 
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     teststring = b'the quick lazy frox jumps over the lazy dog'
     splitter = Splitter(3, teststring)
-    chunks = list(splitter.split)
+    chunks = list(splitter.splits)
     assert_equal(15, len(chunks))
 
     rejoiner = Rejoiner()
