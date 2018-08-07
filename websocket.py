@@ -22,22 +22,27 @@ class WebsocketHandler:
         remote_clipboard = RemoteClipboard(sock)
         with self._relay.with_clipboard(remote_clipboard):
             while True:
-                incoming_msg = await websocket.recv()
-                logger.debug(f'receiving {log.format_obj(incoming_msg)}')
-                await sock.callback(incoming_msg)
+                await sock.callback(await sock.recv_message())
 
 
 class Sock:
 
     # by default the callback doesn't do anything. it has to be set by the
     # relay. this should be overridden by the caller using the setter
+    async def _callback(*args):
+        return None
+
     def __init__(self, websocket):
         self._websocket = websocket
-        self._callback = lambda *args: None
 
     async def send_message(self, message):
         logger.debug(f'sending {log.format_obj(message)}')
         await self._websocket.send(message)
+
+    async def recv_message(self):
+        incoming_msg = await self._websocket.recv()
+        logger.debug(f'receiving {log.format_obj(incoming_msg)}')
+        return incoming_msg
 
     @property
     def callback(self):
