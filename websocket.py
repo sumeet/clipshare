@@ -4,6 +4,7 @@ import log
 import pickle
 
 import chunk
+from chunked_receiving import ChunkedMessageReceiver
 import signals
 from remote_clipboard import RemoteClipboard
 
@@ -27,9 +28,22 @@ class WebsocketHandler:
         logger.debug(f'connected with {sock.connection_details}')
         remote_clipboard = RemoteClipboard(sock)
         with self._relay.with_clipboard(remote_clipboard):
-            while True:
-                new_message = await sock.recv_message()
-                asyncio.ensure_future(remote_clipboard.callback(new_message))
+            msgs = depickled(websocket)
+            chunked_message_receiver = ChunkedMessageReceiver(msgs)
+            async for new_message in chunked_message_receiver.received_messages:
+                logger.debug('got a new message, awaiting payload')
+                payload = await new_message.full_payload
+                logger.debug('awaited payload')
+                asyncio.ensure_future(remote_clipboard.callback(payload))
+
+            #while True:
+                #new_message = await sock.recv_message()
+                #asyncio.ensure_future(remote_clipboard.callback(new_message))
+
+
+async def depickled(websocket_messages):
+    async for message in websocket_messages:
+        yield pickle.loads(message)
 
 
 class Sock:
