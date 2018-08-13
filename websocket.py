@@ -28,7 +28,8 @@ class WebsocketHandler:
         remote_clipboard = RemoteClipboard(sock)
         with self._relay.with_clipboard(remote_clipboard):
             while True:
-                await remote_clipboard.callback(await sock.recv_message())
+                new_message = await sock.recv_message()
+                asyncio.ensure_future(remote_clipboard.callback(new_message))
 
 
 class Sock:
