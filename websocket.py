@@ -28,7 +28,7 @@ class WebsocketHandler:
         remote_clipboard = RemoteClipboard(sock)
         with self._relay.with_clipboard(remote_clipboard):
             while True:
-                await sock.callback(await sock.recv_message())
+                await remote_clipboard.callback(await sock.recv_message())
 
 
 class Sock:
@@ -45,11 +45,6 @@ class Sock:
     def with_chunking(cls, websocket):
         return cls(websocket, Chunker())
 
-    # by default the callback doesn't do anything. it has to be set by the
-    # relay. this should be overridden by the caller using the setter
-    async def _callback(*args):
-        return None
-
     def __init__(self, websocket, chunker):
         self._websocket = websocket
         self._chunker = chunker
@@ -57,16 +52,12 @@ class Sock:
 
     async def send_message(self, message):
         logger.debug(f'sending {log.format_obj(message)}')
-
         chunks = self._chunker.chunk(message)
+
         first_chunk = next(chunks)
         self._signaler.begin_outgoing_transfer(first_chunk.total_chunks)
-
-        #futures = []
-        #futures.append(self._send_on_websocket(first_chunk))
-        #futures.extend(map(self._send_on_websocket, chunks))
-        #await asyncio.gather(*futures)
         await self._send_on_websocket(first_chunk)
+
         for chunk in chunks:
             await self._send_on_websocket(chunk)
 
@@ -88,14 +79,6 @@ class Sock:
             complete_message = self._chunker.receive_chunk(chunk)
         else:
             return complete_message
-
-    @property
-    def callback(self):
-        return self._callback
-
-    @callback.setter
-    def callback(self, callback):
-        self._callback = callback
 
     @property
     def connection_details(self):
