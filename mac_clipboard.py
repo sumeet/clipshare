@@ -6,6 +6,7 @@ from ScriptingBridge import NSArray
 from ScriptingBridge import NSImage
 from ScriptingBridge import NSPasteboard
 from ScriptingBridge import NSString
+from asyncblink import AsyncSignal
 
 
 logger = log.getLogger(__name__)
@@ -27,10 +28,11 @@ class MacClipboard:
         return cls(NSPasteboard.generalPasteboard())
 
     def __init__(self, ns_pasteboard):
+        self.new_clipboard_contents_signal = AsyncSignal()
         self._ns_pasteboard = ns_pasteboard
         self._poller = Poller(self._ns_pasteboard)
 
-    async def update(self, clipboard_contents):
+    def set(self, clipboard_contents):
         object_to_set = self._extract_settable_nsobject(clipboard_contents)
         if not object_to_set:
             all_types = repr(clipboard_contents.keys())
@@ -54,21 +56,19 @@ class MacClipboard:
             # and then when it resumes, it won't detect that change
             self._poller.resume_polling()
 
-    # by default the callback doesn't do anything. it has to be set by the
-    # relay. this should be overwritten by the caller
-    _callback = lambda *args: None
+    def clear(self):
+        self.set({})
 
-    def set_callback_for_updates(self, callback):
-        self._callback = callback
-        asyncio.ensure_future(self.poll_forever())
+    def start_listening_for_changes(self):
+        asyncio.ensure_future(clipboard.poll_forever())
 
-    async def poll_forever(self):
+    async def _poll_forever(self):
         while True:
             clipboard_contents = self._poller.poll_for_new_clipboard_contents()
             if clipboard_contents:
                 logger.debug(f'detected change {self._poller.current_change_count} '
                              + log.format_obj(clipboard_contents))
-                await self._callback(clipboard_contents)
+                self.new_clipboard_contents_signal.send(clipboard_contents)
 
             await asyncio.sleep(CLIPBOARD_POLL_INTERVAL_SECONDS)
 

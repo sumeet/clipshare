@@ -1,7 +1,5 @@
 import asyncio
 
-from chunk import Splitter
-
 
 class ChunkedMessageReceiver:
 
@@ -29,7 +27,6 @@ class ChunkedMessageReceiver:
         await self._queue.put(StopIteration)
 
 
-# async version of the rejoiner in chunk.py
 class Rejoiner:
 
     def __init__(self):
@@ -46,6 +43,8 @@ class Rejoiner:
         chunked_message = self._messages_by_hash[chunk.message_hash]
         chunked_message.set_result(chunk)
         if chunked_message.is_done:
+            # don't hang onto chunks forever, drop our reference once we no
+            # longer need to process them
             del self._messages_by_hash[chunk.message_hash]
 
         if received_first_chunk_of_new_message:
@@ -65,6 +64,9 @@ class ChunkedMessage:
 
     @property
     async def chunks(self):
+        # i'm pretty sure we actually do receive the chunks in order. if not,
+        # then using asyncio.as_completed here will yield the chunks as they're
+        # available, instead of in ascending order
         for chunk_future in self._chunk_futures:
             yield (await chunk_future)
 
@@ -77,6 +79,8 @@ class ChunkedMessage:
 
 
 if __name__ == '__main__':
+    from chunked_sending import Splitter
+
     def assert_equal(lhs, rhs):
         if lhs != rhs:
             raise AssertionError(f'{lhs} != {rhs}')
@@ -86,7 +90,7 @@ if __name__ == '__main__':
 
     async def new_chunk_generator():
         for teststring in [teststring_a, teststring_b]:
-            for split in  Splitter(3, teststring).splits:
+            for split in  Splitter.split(teststring, split_size=3):
                 await asyncio.sleep(0.001)
                 yield split
 

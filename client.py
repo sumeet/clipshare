@@ -81,7 +81,9 @@ class Connection:
         if client_future.cancelled():
             # if cancelled, that means WE cancelled it. don't reconnect
             return
-        logger.info('got disconnected from the server')
+
+        # otherwise, we were disconnected unexpectedly. try to reconnect
+        logger.info('got disconnected from the server unexpectedly')
         e = client_future.exception()
         if e:
             try:
@@ -111,8 +113,8 @@ def start_ui(qapp, connection):
 if __name__ == '__main__':
     qapp = QApplication([])
 
-    # do this first because the rest of the proggy depnds on this being established
-    # as the event loop
+    # do this first because the rest of the proggy depnds on this being
+    # established as the event loop
     event_loop = QEventLoop(qapp)
     asyncio.set_event_loop(event_loop)
 

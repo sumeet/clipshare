@@ -1,4 +1,3 @@
-import asyncio
 import signal
 
 from PyQt5.QtCore import QBuffer
@@ -21,23 +20,28 @@ class LinuxClipboard:
         return cls(qt_app.clipboard())
 
     def __init__(self, qt_clipboard):
+        self.new_clipboard_contents_signal = AsyncSignal()
         self._qt_clipboard = qt_clipboard
 
-    async def update(self, clipboard_contents):
+    def set(self, clipboard_contents):
         convert_tif_to_png_to_fix_pasting_in_google_chrome_linux(clipboard_contents)
         qmimedata_to_set = QMimeDataSerializer.deserialize(clipboard_contents)
         self._qt_clipboard.setMimeData(qmimedata_to_set)
 
-    def set_callback_for_updates(self, callback):
-        def when_clipboard_changes():
-            mime_data = self._qt_clipboard.mimeData()
-            clipboard_contents = QMimeDataSerializer.serialize(mime_data)
-            logger.debug(f'detected change {log.format_obj(clipboard_contents)}')
-            if not self._contains_data(clipboard_contents):
-                logger.debug('nothing to update, backing out')
-                return
-            asyncio.ensure_future(callback(clipboard_contents))
-        self._qt_clipboard.dataChanged.connect(when_clipboard_changes)
+    def clear(self):
+        self.set({})
+
+    def start_listening_for_changes(self):
+        self._qt_clipboard.dataChanged.connect(self._grab_and_signal_clipboard_data)
+
+    def _grab_and_signal_clipboard_data(self):
+        mime_data = self._qt_clipboard.mimeData()
+        clipboard_contents = QMimeDataSerializer.serialize(mime_data)
+        logger.debug(f'detected change {log.format_obj(clipboard_contents)}')
+        if self._contains_data(clipboard_contents):
+            self.new_clipboard_contents_signal.send(clipboard_contents)
+        else:
+            logger.debug('nothing to update, backing out')
 
     def _contains_data(self, clipboard_contents):
         return any(clipboard_contents.values())

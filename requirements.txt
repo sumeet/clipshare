@@ -10,3 +10,4 @@ websockets==5.0.1
 Pillow
 blinker
 cached_property
+asyncblink
