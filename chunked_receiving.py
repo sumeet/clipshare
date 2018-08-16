@@ -1,4 +1,5 @@
 import asyncio
+import pickle
 
 
 class ChunkedMessageReceiver:
@@ -35,7 +36,7 @@ class Rejoiner:
     def process_incoming_chunk(self, chunk):
         if chunk.message_hash not in self._messages_by_hash:
             self._messages_by_hash[chunk.message_hash] = \
-                ChunkedMessage(chunk.total_chunks)
+                ChunkedMessage(chunk.message_hash, chunk.total_chunks)
             received_first_chunk_of_new_message = True
         else:
             received_first_chunk_of_new_message = False
@@ -53,14 +54,14 @@ class Rejoiner:
 
 class ChunkedMessage:
 
-    def __init__(self, total_number_of_chunks):
-        self._chunk_futures = [asyncio.Future() for _ in
-                               range(total_number_of_chunks)]
+    def __init__(self, hash, num_chunks):
+        self.hash = hash
+        self._chunk_futures = [asyncio.Future() for _ in range(num_chunks)]
 
     @property
     async def full_payload(self):
         all_chunks = await asyncio.gather(*self._chunk_futures)
-        return b''.join(chunk.data for chunk in all_chunks)
+        return pickle.loads(b''.join(chunk.data for chunk in all_chunks))
 
     @property
     async def chunks(self):

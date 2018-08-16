@@ -2,21 +2,20 @@ from asyncio import ensure_future
 import asyncio
 import os
 import signal
-import threading
-import time
 
 from PyQt5.QtWidgets import QApplication
 from quamash import QEventLoop
 import websockets
 
+from client_relay_node import ClientRelayNode
 from local_clipboard import LocalClipboard
 import log
 from relay import Relay
+from remote_relay_node import RemoteRelayNode
 import signals
 from ui import UI
 from websocket import MAX_PAYLOAD_SIZE
-from websocket import Sock
-from websocket import WebsocketHandler
+from websocket import keepalive_forever
 
 
 logger = log.getLogger(__name__)
@@ -25,34 +24,13 @@ logger = log.getLogger(__name__)
 RECONNECT_WAIT_SECONDS = 5
 WS_URL = os.environ['WS_URL']
 
-KEEPALIVE_INTERVAL_SECONDS = 30
-
-
-# when running clipshare behind nginx, the server and client would seem to get
-# disconnected frequently. at least on dokku's settings. adding this keepalive
-# fixes the problem there. it's probably good to keep this in here. i bet it'll
-# help with other configurations as well.
-async def keepalive_forever(websocket, interval_seconds):
-    while True:
-        await asyncio.sleep(interval_seconds)
-        await websocket.ping()
-
-
-async def client(websocket_handler, url):
-    async with websockets.connect(url,  max_size=MAX_PAYLOAD_SIZE) as websocket:
-        signals.connection_established.send()
-
-        ensure_future(keepalive_forever(websocket, KEEPALIVE_INTERVAL_SECONDS))
-        await websocket_handler.handle(websocket,
-                                       'the path is only used for servers')
-
 
 class Connection:
 
     def __init__(self, relay, ws_url):
-        self._websocket_handler = WebsocketHandler(relay, Sock.with_chunking)
+        self._relay = relay
         self._ws_url = ws_url
-        self._client_future = None
+        self._websocket_future = None
 
     def connect(self):
         if self.is_active:
@@ -60,20 +38,26 @@ class Connection:
 
         signals.connection_connecting.send()
 
-        c = client(self._websocket_handler, self._ws_url)
-        self._client_future = ensure_future(c)
-        self._client_future.add_done_callback(self._client_future_done)
+        self._websocket_future = ensure_future(self._establish_connection())
+        self._websocket_future.add_done_callback(self._client_future_done)
+
+    async def _establish_connection(self):
+        async with websockets.connect(self._ws_url,
+                                      max_size=MAX_PAYLOAD_SIZE) as websocket:
+            signals.connection_established.send()
+            with self._relay.with_node(RemoteRelayNode(websocket)):
+                await keepalive_forever(websocket)
 
     def disconnect(self):
         logger.info('requested disconnect: disconnecting from server')
         if self.is_active:
-            self._client_future.cancel()
+            self._websocket_future.cancel()
 
     # XXX: this doesn't neccessarily mean we're connected to the server. it
     # could mean we're still trying to establish a connection
     @property
     def is_active(self):
-        return self._client_future and not self._client_future.done()
+        return self._websocket_future and not self._websocket_future.done()
 
     def _client_future_done(self, client_future):
         signals.connection_disconnected.send()
@@ -113,23 +97,24 @@ def start_ui(qapp, connection):
 if __name__ == '__main__':
     qapp = QApplication([])
 
+    import logging
+    logging.basicConfig(format='%(levelname)s:%(module)s:%(message)s', level=logging.DEBUG)
+
     # do this first because the rest of the proggy depnds on this being
     # established as the event loop
     event_loop = QEventLoop(qapp)
+    event_loop.set_debug(True)
     asyncio.set_event_loop(event_loop)
 
     # we need this to make it so ^c will quit the program
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     relay = Relay()
+    with relay.with_node(ClientRelayNode(LocalClipboard.new(qapp))):
+        connection = Connection(relay, WS_URL)
+        connection.connect()
 
-    local_clipboard = LocalClipboard.new(qapp)
-    relay.add_clipboard(local_clipboard)
+        ui = start_ui(qapp, connection)
 
-    connection = Connection(relay, WS_URL)
-    connection.connect()
-
-    ui = start_ui(qapp, connection)
-
-    with event_loop:
-        event_loop.run_forever()
+        with event_loop:
+                event_loop.run_forever()

@@ -3,6 +3,7 @@ import pickle
 
 from asyncblink import AsyncSignal
 
+from chunked_receiving import ChunkedMessageReceiver
 import log
 
 
@@ -26,7 +27,7 @@ class RemoteRelayNode:
         asyncio.ensure_future(self._process_messages())
 
     async def _process_messages(self):
-        async for message in self._chunked_message_receiver:
+        async for message in self._chunked_message_receiver.received_messages:
             self.new_message_signal.send(message)
 
     @property
@@ -34,5 +35,10 @@ class RemoteRelayNode:
         return ChunkedMessageReceiver(self._depickled_socket_messages)
 
     @property
-    def _depickled_socket_messages(self):
-        return (pickle.loads(msg) async for msg in self._websocket)
+    async def _depickled_socket_messages(self):
+        async for msg in self._websocket:
+            yield pickle.loads(msg)
+
+    def __repr__(self):
+        return (f'<{type(self).__name__}: '
+                f'{self._websocket.host}:{self._websocket.port}')

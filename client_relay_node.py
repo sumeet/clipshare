@@ -15,10 +15,7 @@ class ClientRelayNode:
 
     def __init__(self, clipboard):
         self.new_message_signal = AsyncSignal()
-
         self._clipboard = clipboard
-        self._clipboard.new_clipboard_contents_signal.connect(
-            self._handle_new_clipboard_contents_signal)
 
     async def accept_relayed_message(self, message):
         # we receive the message here after receiving the first chunk fully. up
@@ -38,8 +35,13 @@ class ClientRelayNode:
         self._clipboard.set(await message.full_payload)
 
     def start_relaying_changes(self):
+        self._clipboard.new_clipboard_contents_signal.connect(
+            self._handle_new_clipboard_contents_signal)
         self._clipboard.start_listening_for_changes()
 
     def _handle_new_clipboard_contents_signal(self, clipboard_contents):
         message = Message(payload=clipboard_contents, split_size=BYTES_PER_SPLIT)
         self.new_message_signal.send(message)
+
+    def __repr__(self):
+        return f'<{type(self).__name__}: {type(self._clipboard).__name__}'

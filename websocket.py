@@ -17,33 +17,17 @@ logger = log.getLogger(__name__)
 MAX_PAYLOAD_SIZE = None
 
 
-class WebsocketHandler:
-
-    def __init__(self, relay, sock_factory):
-        self._relay = relay
-        self._sock_factory = sock_factory
-
-    async def handle(self, websocket, path):  # yup, we're ignoring path
-        sock = self._sock_factory(websocket)
-        logger.debug(f'connected with {sock.connection_details}')
-        remote_clipboard = RemoteClipboard(sock)
-        with self._relay.with_clipboard(remote_clipboard):
-            msgs = depickled(websocket)
-            chunked_message_receiver = ChunkedMessageReceiver(msgs)
-            async for new_message in chunked_message_receiver.received_messages:
-                logger.debug('got a new message, awaiting payload')
-                payload = await new_message.full_payload
-                logger.debug('awaited payload')
-                asyncio.ensure_future(remote_clipboard.callback(payload))
-
-            #while True:
-                #new_message = await sock.recv_message()
-                #asyncio.ensure_future(remote_clipboard.callback(new_message))
+KEEPALIVE_INTERVAL_SECONDS = 30
 
 
-async def depickled(websocket_messages):
-    async for message in websocket_messages:
-        yield pickle.loads(message)
+# when running clipshare behind nginx, the server and client would seem to get
+# disconnected frequently. at least on dokku's settings. adding this keepalive
+# fixes the problem there. it's probably good to keep this in here. i bet it'll
+# help with other configurations as well.
+async def keepalive_forever(websocket):
+    while True:
+        await asyncio.sleep(KEEPALIVE_INTERVAL_SECONDS)
+        await websocket.ping()
 
 
 class Sock:

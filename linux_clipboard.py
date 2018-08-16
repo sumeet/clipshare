@@ -1,5 +1,6 @@
 import signal
 
+from asyncblink import AsyncSignal
 from PyQt5.QtCore import QBuffer
 from PyQt5.QtCore import QByteArray
 from PyQt5.QtCore import QIODevice
@@ -29,7 +30,7 @@ class LinuxClipboard:
         self._qt_clipboard.setMimeData(qmimedata_to_set)
 
     def clear(self):
-        self.set({})
+        self._qt_clipboard.clear()
 
     def start_listening_for_changes(self):
         self._qt_clipboard.dataChanged.connect(self._grab_and_signal_clipboard_data)

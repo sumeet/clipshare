@@ -1,5 +1,6 @@
 from collections import namedtuple
 import math
+import pickle
 
 from cached_property import cached_property
 
@@ -16,7 +17,17 @@ class Message:
 
     @property
     async def chunks(self):
-        return Splitter.split(self._payload, split_size=self._split_size)
+        serialized = pickle.dumps(self._payload)
+        for chunk in Splitter.split(serialized, split_size=self._split_size):
+            yield chunk
+
+    @cached_property
+    def hash(self):
+        return message_hash(self._payload)
+
+
+def message_hash(message):
+    return hash(message)
 
 
 class Splitter:
@@ -44,7 +55,7 @@ class Splitter:
 
     @cached_property
     def _message_hash(self):
-        return hash(self._message)
+        return message_hash(self._message)
 
 
 def segment(string, split_size):
@@ -81,4 +92,3 @@ class Chunk(namedtuple('Chunk', 'chunk_index total_chunks data message_hash')):
     @property
     def is_the_last_chunk(self):
         return self.chunk_index == self.total_chunks - 1
-

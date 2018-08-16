@@ -38,6 +38,7 @@ class MacClipboard:
             all_types = repr(clipboard_contents.keys())
             logger.debug('unsupported clipboard payload ' +
                          log.format_obj(clipboard_contents))
+            return
 
         try:
             # pause the poller while we write to it, so we don't detect our own
@@ -57,19 +58,24 @@ class MacClipboard:
             self._poller.resume_polling()
 
     def clear(self):
-        self.set({})
+        logger.debug('clearing the clipboard')
+        self._ns_pasteboard.clearContents()
 
     def start_listening_for_changes(self):
-        asyncio.ensure_future(clipboard.poll_forever())
+        asyncio.ensure_future(self._poll_forever())
 
     async def _poll_forever(self):
         while True:
+            t = time.time()
+            logger.debug('polling for new clipboard contents')
             clipboard_contents = self._poller.poll_for_new_clipboard_contents()
+            logger.debug(f'done polling for new clipboard contents. took: {time.time() - t} seconds')
             if clipboard_contents:
                 logger.debug(f'detected change {self._poller.current_change_count} '
                              + log.format_obj(clipboard_contents))
                 self.new_clipboard_contents_signal.send(clipboard_contents)
 
+            logger.debug('just about to sleep')
             await asyncio.sleep(CLIPBOARD_POLL_INTERVAL_SECONDS)
 
     def _extract_settable_nsobject(self, clipboard_contents):
@@ -120,7 +126,7 @@ class Poller:
         # immediately after setting the clipboard, we tell ourselves to ignore that
         # update
         if current_change_count == self._change_count_to_ignore:
-            logger.debug('ignoring bc we told ourselves to ignore '
+            logger.debug('ignoring the update we set ourselves: '
                          f'{current_change_count}')
             return None
 
