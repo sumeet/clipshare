@@ -97,9 +97,6 @@ def start_ui(qapp, connection):
 if __name__ == '__main__':
     qapp = QApplication([])
 
-    import logging
-    logging.basicConfig(format='%(levelname)s:%(module)s:%(message)s', level=logging.DEBUG)
-
     # do this first because the rest of the proggy depnds on this being
     # established as the event loop
     event_loop = QEventLoop(qapp)

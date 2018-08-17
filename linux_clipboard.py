@@ -1,4 +1,4 @@
-import signal
+import contextlib
 
 from asyncblink import AsyncSignal
 from PyQt5.QtCore import QBuffer
@@ -25,15 +25,27 @@ class LinuxClipboard:
         self._qt_clipboard = qt_clipboard
 
     def set(self, clipboard_contents):
-        convert_tif_to_png_to_fix_pasting_in_google_chrome_linux(clipboard_contents)
-        qmimedata_to_set = QMimeDataSerializer.deserialize(clipboard_contents)
-        self._qt_clipboard.setMimeData(qmimedata_to_set)
+        with self._stop_receiving_clipboard_updates():
+            convert_tif_to_png_to_fix_pasting_in_google_chrome_linux(clipboard_contents)
+            qmimedata_to_set = QMimeDataSerializer.deserialize(clipboard_contents)
+            self._qt_clipboard.setMimeData(qmimedata_to_set)
 
     def clear(self):
-        self._qt_clipboard.clear()
+        with self._stop_receiving_clipboard_updates():
+            self._qt_clipboard.clear()
 
     def start_listening_for_changes(self):
         self._qt_clipboard.dataChanged.connect(self._grab_and_signal_clipboard_data)
+
+    # temporarily stop listening to the clipboard while we set it, because we
+    # don't want to detect our own updates
+    @contextlib.contextmanager
+    def _stop_receiving_clipboard_updates(self):
+        try:
+            self._qt_clipboard.dataChanged.disconnect(self._grab_and_signal_clipboard_data)
+            yield
+        finally:
+            self.start_listening_for_changes()
 
     def _grab_and_signal_clipboard_data(self):
         mime_data = self._qt_clipboard.mimeData()

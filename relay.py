@@ -44,6 +44,7 @@ class Relay:
     async def _send_message_to_node(self, node, message):
         logger.debug(f'sending update to {repr(node)}: {log.format_obj(message)}')
         await node.accept_relayed_message(message)
+        logger.debug(f'done sending update to {repr(node)}')
 
     def _get_nodes_other_than(self, other_than_node):
         return [node for node in self._nodes if node != other_than_node]

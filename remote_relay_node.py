@@ -41,4 +41,4 @@ class RemoteRelayNode:
 
     def __repr__(self):
         return (f'<{type(self).__name__}: '
-                f'{self._websocket.host}:{self._websocket.port}')
+                f'{self._websocket.host}:{self._websocket.port}>')

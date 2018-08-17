@@ -44,4 +44,4 @@ class ClientRelayNode:
         self.new_message_signal.send(message)
 
     def __repr__(self):
-        return f'<{type(self).__name__}: {type(self._clipboard).__name__}'
+        return f'<{type(self).__name__}: {type(self._clipboard).__name__}>'
