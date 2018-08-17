@@ -1,7 +1,0 @@
-- instead of relay connecting directly to clipboards, it connects to RelayNodes
-- RelayNode can either be a LocalRelayNode (which would hold an instance of
-  (clipboard), or a RemoteRelayNode, which would hold an instance of a websocket
-- a remote RelayNode, would process an incoming message, and always want to send
-  chunks to it. pretty sure i can do that with the iterator protocol, local one
-  will always generate a ChunkedMessage with the data fully initialized
-- argh this is gonna be a huge refactoring :(
