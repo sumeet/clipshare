@@ -6,6 +6,11 @@ from ScriptingBridge import NSArray
 from ScriptingBridge import NSImage
 from ScriptingBridge import NSPasteboard
 from ScriptingBridge import NSString
+from asyncblink import AsyncSignal
+from tenacity import retry
+from tenacity import retry_if_exception_type
+from tenacity import stop_after_attempt
+from tenacity import wait_fixed
 
 
 logger = log.getLogger(__name__)
@@ -27,15 +32,17 @@ class MacClipboard:
         return cls(NSPasteboard.generalPasteboard())
 
     def __init__(self, ns_pasteboard):
+        self.new_clipboard_contents_signal = AsyncSignal()
         self._ns_pasteboard = ns_pasteboard
         self._poller = Poller(self._ns_pasteboard)
 
-    async def update(self, clipboard_contents):
+    def set(self, clipboard_contents):
         object_to_set = self._extract_settable_nsobject(clipboard_contents)
         if not object_to_set:
             all_types = repr(clipboard_contents.keys())
             logger.debug('unsupported clipboard payload ' +
                          log.format_obj(clipboard_contents))
+            return
 
         try:
             # pause the poller while we write to it, so we don't detect our own
@@ -54,22 +61,21 @@ class MacClipboard:
             # and then when it resumes, it won't detect that change
             self._poller.resume_polling()
 
-    # by default the callback doesn't do anything. it has to be set by the
-    # relay. this should be overwritten by the caller
-    _callback = lambda *args: None
+    def clear(self):
+        logger.debug('clearing the clipboard')
+        self._ns_pasteboard.clearContents()
 
-    def set_callback_for_updates(self, callback):
-        self._callback = callback
-        asyncio.ensure_future(self.poll_forever())
+    def start_listening_for_changes(self):
+        asyncio.ensure_future(self._poll_forever())
 
-    async def poll_forever(self):
+    async def _poll_forever(self):
         while True:
-            clipboard_contents = self._poller.poll_for_new_clipboard_contents()
+            t = time.time()
+            clipboard_contents = await self._poller.poll_for_new_clipboard_contents()
             if clipboard_contents:
                 logger.debug(f'detected change {self._poller.current_change_count} '
                              + log.format_obj(clipboard_contents))
-                await self._callback(clipboard_contents)
-
+                self.new_clipboard_contents_signal.send(clipboard_contents)
             await asyncio.sleep(CLIPBOARD_POLL_INTERVAL_SECONDS)
 
     def _extract_settable_nsobject(self, clipboard_contents):
@@ -104,7 +110,7 @@ class Poller:
     def current_change_count(self):
         return self._ns_pasteboard.changeCount()
 
-    def poll_for_new_clipboard_contents(self):
+    async def poll_for_new_clipboard_contents(self):
         if self._paused:
             return None
 
@@ -114,17 +120,20 @@ class Poller:
         if current_change_count == self._last_seen_change_count:
             return None
 
+        logger.debug(f'change count changed. '
+                     f'previously {self._last_seen_change_count}, now '
+                     f'{current_change_count}')
         self._last_seen_change_count = current_change_count
 
         # this logic prevents us from propagating our own clipboard updates.
         # immediately after setting the clipboard, we tell ourselves to ignore that
         # update
         if current_change_count == self._change_count_to_ignore:
-            logger.debug('ignoring bc we told ourselves to ignore '
+            logger.debug('ignoring the update we set ourselves: '
                          f'{current_change_count}')
             return None
 
-        return extract_clipboard_contents(self._ns_pasteboard)
+        return await extract_clipboard_contents(self._ns_pasteboard)
 
     def pause_polling(self):
         self._paused = True
@@ -141,26 +150,28 @@ MIME_TYPE_BY_READABLE_TYPE = {'public.tiff': 'image/tiff',
 
 READABLE_TYPES = MIME_TYPE_BY_READABLE_TYPE.keys()
 
-def extract_clipboard_contents(ns_pasteboard):
+
+class NoReadableTypesError(Exception): pass
+class NoDataError(Exception): pass
+
+@retry(retry=retry_if_exception_type((NoReadableTypesError, NoDataError)),
+       stop=stop_after_attempt(NS_PASTEBOARD_RETRY_COUNT),
+       # XXX: there's a weird quirk in the os x clipboard. sometimes it fails to
+       # read, and after retrying, it reads pretty slowly. i have other things
+       # to code for now, but i can come back to this later. slow is very slow,
+       # like 10 seconds
+       wait=wait_fixed(0.1),
+       retry_error_callback=lambda retry_state: None)
+async def extract_clipboard_contents(ns_pasteboard):
     data_type = ns_pasteboard.availableTypeFromArray_(READABLE_TYPES)
     mime_type = MIME_TYPE_BY_READABLE_TYPE.get(data_type)
     if not mime_type:
-        return None
+        logger.debug(f"didn't find any readable types among: {list(ns_pasteboard.types())}")
+        raise NoReadableTypesError
 
-    retries_remaining = NS_PASTEBOARD_RETRY_COUNT
-    while retries_remaining:
-        ns_pasteboard_data = ns_pasteboard.dataForType_(data_type)
-        if ns_pasteboard_data:
-            break
-        else:
-            logger.debug(f'failed querying NSPasteboard for type {mime_type}, '
-                         'retrying')
-            retries_remaining -= 1
-    else:
-        # if we ran out of retries, then just give up
-        #
-        # TODO: maybe show the user an error if this happens?
-        return None
-
-    clipboard_data = bytes(ns_pasteboard_data)
-    return {mime_type: clipboard_data}
+    ns_pasteboard_data = ns_pasteboard.dataForType_(data_type)
+    if not ns_pasteboard_data:
+        logger.debug(f'failed querying NSPasteboard for type {mime_type}, '
+                     'retrying')
+        raise NoDataError
+    return {mime_type: bytes(ns_pasteboard_data)}

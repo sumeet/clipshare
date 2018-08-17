@@ -1,33 +1,72 @@
 from collections import namedtuple
-from functools import partial
 import math
 import pickle
 
 from cached_property import cached_property
 
 
+class Message:
+
+    def __init__(self, payload, *, split_size):
+        self._payload = payload
+        self._split_size = split_size
+
+    @property
+    async def full_payload(self):
+        return self._payload
+
+    @property
+    async def chunks(self):
+        for chunk in self._splitter.splits:
+            yield chunk
+
+    @property
+    def num_chunks(self):
+        return self._splitter.num_chunks
+
+    @cached_property
+    def hash(self):
+        return message_hash(self._payload)
+
+    @cached_property
+    def _splitter(self):
+        return Splitter(self._serialized, split_size=self._split_size)
+
+    @cached_property
+    def _serialized(self):
+        return pickle.dumps(self._payload)
+
+
+def message_hash(message):
+    return hash(message)
+
+
 class Splitter:
 
-    def __init__(self, split_size, message):
-        self._split_size = split_size
+    @classmethod
+    def split(cls, *args, **kwargs):
+        return cls(*args, **kwargs).splits
+
+    def __init__(self, message, *, split_size):
         self._message = message
+        self._split_size = split_size
 
     @property
     def splits(self):
         for index, data in enumerate(segment(self._message, self._split_size)):
             yield self._new_chunk(index, data)
 
+    @cached_property
+    def num_chunks(self):
+        return math.ceil(len(self._message) / self._split_size)
+
     def _new_chunk(self, chunk_index, data):
         return Chunk(message_hash=self._message_hash, chunk_index=chunk_index,
-                     total_chunks=self._total_number_of_chunks, data=data)
-
-    @cached_property
-    def _total_number_of_chunks(self):
-        return math.ceil(len(self._message) / self._split_size)
+                     total_chunks=self.num_chunks, data=data)
 
     @cached_property
     def _message_hash(self):
-        return hash(self._message)
+        return message_hash(self._message)
 
 
 def segment(string, split_size):
@@ -64,22 +103,3 @@ class Chunk(namedtuple('Chunk', 'chunk_index total_chunks data message_hash')):
     @property
     def is_the_last_chunk(self):
         return self.chunk_index == self.total_chunks - 1
-
-
-if __name__ == '__main__':
-    def assert_equal(lhs, rhs):
-        if lhs != rhs:
-            raise AssertionError(f'{lhs} != {rhs}')
-
-    teststring = b'the quick lazy frox jumps over the lazy dog'
-    splitter = Splitter(3, teststring)
-    chunks = list(splitter.splits)
-    assert_equal(15, len(chunks))
-
-    rejoiner = Rejoiner()
-    for i in range(len(chunks) - 1):
-        assert_equal(None, rejoiner.process_incoming_chunk(chunks[i]))
-    assert_equal(teststring, rejoiner.process_incoming_chunk(chunks[-1]))
-
-    # we should've cleaned up rejoining data we don't need anymore
-    assert_equal({}, rejoiner._chunks_by_hash)
