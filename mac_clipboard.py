@@ -12,6 +12,8 @@ from tenacity import retry_if_exception_type
 from tenacity import stop_after_attempt
 from tenacity import wait_fixed
 
+from image import change_tiff_to_png
+
 
 logger = log.getLogger(__name__)
 
@@ -133,7 +135,9 @@ class Poller:
                          f'{current_change_count}')
             return None
 
-        return await extract_clipboard_contents(self._ns_pasteboard)
+        extracted_contents = await extract_clipboard_contents(self._ns_pasteboard)
+        change_tiff_to_png(extracted_contents)
+        return extracted_contents
 
     def pause_polling(self):
         self._paused = True
