@@ -5,6 +5,8 @@ from asyncblink import AsyncSignal
 
 from chunked_receiving import ChunkedMessageReceiver
 import log
+import signals
+from transfer_progress import ProgressSignaler
 
 
 logger = log.getLogger(__name__)
@@ -18,10 +20,13 @@ class RemoteRelayNode:
     def __init__(self, websocket):
         self.new_message_signal = AsyncSignal()
         self._websocket = websocket
+        self._progress_signaler = ProgressSignaler(signals.outgoing_transfer)
 
     async def accept_relayed_message(self, message):
+        self._progress_signaler.begin_transfer(message)
         async for chunk in message.chunks:
             await self._websocket.send(pickle.dumps(chunk))
+            self._progress_signaler.on_chunk_transferred()
 
     def start_relaying_changes(self):
         asyncio.ensure_future(self._process_messages())

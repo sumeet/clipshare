@@ -71,18 +71,11 @@ class MacClipboard:
     async def _poll_forever(self):
         while True:
             t = time.time()
-            logger.debug('polling for new clipboard contents')
             clipboard_contents = await self._poller.poll_for_new_clipboard_contents()
-            logger.debug(f'done polling for new clipboard contents. took: {time.time() - t} seconds')
             if clipboard_contents:
                 logger.debug(f'detected change {self._poller.current_change_count} '
                              + log.format_obj(clipboard_contents))
-
-                logger.debug('delivering new clipboard contents signal')
                 self.new_clipboard_contents_signal.send(clipboard_contents)
-                logger.debug('done delivering new clipboard contents signal')
-
-            logger.debug('just about to sleep')
             await asyncio.sleep(CLIPBOARD_POLL_INTERVAL_SECONDS)
 
     def _extract_settable_nsobject(self, clipboard_contents):
@@ -140,10 +133,7 @@ class Poller:
                          f'{current_change_count}')
             return None
 
-        logger.debug('extracting contents')
-        c = await extract_clipboard_contents(self._ns_pasteboard)
-        logger.debug('done extracting contents')
-        return c
+        return await extract_clipboard_contents(self._ns_pasteboard)
 
     def pause_polling(self):
         self._paused = True
@@ -159,6 +149,7 @@ MIME_TYPE_BY_READABLE_TYPE = {'public.tiff': 'image/tiff',
                               'public.utf8-plain-text': 'text/plain'}
 
 READABLE_TYPES = MIME_TYPE_BY_READABLE_TYPE.keys()
+
 
 class NoReadableTypesError(Exception): pass
 class NoDataError(Exception): pass

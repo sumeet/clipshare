@@ -17,13 +17,24 @@ class Message:
 
     @property
     async def chunks(self):
-        serialized = pickle.dumps(self._payload)
-        for chunk in Splitter.split(serialized, split_size=self._split_size):
+        for chunk in self._splitter.splits:
             yield chunk
+
+    @property
+    def num_chunks(self):
+        return self._splitter.num_chunks
 
     @cached_property
     def hash(self):
         return message_hash(self._payload)
+
+    @cached_property
+    def _splitter(self):
+        return Splitter(self._serialized, split_size=self._split_size)
+
+    @cached_property
+    def _serialized(self):
+        return pickle.dumps(self._payload)
 
 
 def message_hash(message):
@@ -33,25 +44,25 @@ def message_hash(message):
 class Splitter:
 
     @classmethod
-    def split(cls, message, *, split_size):
-        return cls(split_size, message).splits
+    def split(cls, *args, **kwargs):
+        return cls(*args, **kwargs).splits
 
-    def __init__(self, split_size, message):
-        self._split_size = split_size
+    def __init__(self, message, *, split_size):
         self._message = message
+        self._split_size = split_size
 
     @property
     def splits(self):
         for index, data in enumerate(segment(self._message, self._split_size)):
             yield self._new_chunk(index, data)
 
+    @cached_property
+    def num_chunks(self):
+        return math.ceil(len(self._message) / self._split_size)
+
     def _new_chunk(self, chunk_index, data):
         return Chunk(message_hash=self._message_hash, chunk_index=chunk_index,
-                     total_chunks=self._total_number_of_chunks, data=data)
-
-    @cached_property
-    def _total_number_of_chunks(self):
-        return math.ceil(len(self._message) / self._split_size)
+                     total_chunks=self.num_chunks, data=data)
 
     @cached_property
     def _message_hash(self):

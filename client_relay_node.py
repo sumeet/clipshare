@@ -1,7 +1,11 @@
+from asyncio import ensure_future
+
 from asyncblink import AsyncSignal
 
 from chunked_sending import Message
 import log
+import signals
+from transfer_progress import ProgressSignaler
 
 
 # TODO: tune this value to see if it affects speed
@@ -16,6 +20,7 @@ class ClientRelayNode:
     def __init__(self, clipboard):
         self.new_message_signal = AsyncSignal()
         self._clipboard = clipboard
+        self._progress_signaler = ProgressSignaler(signals.incoming_transfer)
 
     async def accept_relayed_message(self, message):
         # we receive the message here after receiving the first chunk fully. up
@@ -32,6 +37,7 @@ class ClientRelayNode:
         logger.debug('got wind of a message, clearing the clipboard')
         self._clipboard.clear()
         logger.debug('actually setting the clipboard')
+        ensure_future(self._broadcast_incoming_transfer_progress(message))
         self._clipboard.set(await message.full_payload)
 
     def start_relaying_changes(self):
@@ -45,3 +51,8 @@ class ClientRelayNode:
 
     def __repr__(self):
         return f'<{type(self).__name__}: {type(self._clipboard).__name__}>'
+
+    async def _broadcast_incoming_transfer_progress(self, message):
+        self._progress_signaler.begin_transfer(message)
+        async for chunk in message.chunks:
+            self._progress_signaler.on_chunk_transferred()

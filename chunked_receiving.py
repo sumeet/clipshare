@@ -56,6 +56,7 @@ class ChunkedMessage:
 
     def __init__(self, hash, num_chunks):
         self.hash = hash
+        self.num_chunks = num_chunks
         self._chunk_futures = [asyncio.Future() for _ in range(num_chunks)]
 
     @property
