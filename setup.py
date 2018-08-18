@@ -27,8 +27,7 @@ setup(
     name='clipshare',
     version='0.1',
     packages=['clipshare'],
-    description='Server and client to share clipboard text and images '
-                'desktop computers',
+    description='Sync clipboard text and images between computers.',
     url='https://github.com/sumeet/clipshare',
     license='GPL',
     author='Sumeet Agarwal',
