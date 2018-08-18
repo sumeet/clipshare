@@ -22,6 +22,7 @@ logger = log.getLogger(__name__)
 
 
 RECONNECT_WAIT_SECONDS = 5
+CONNECTION_ESTABLISH_TIMEOUT = 7
 WS_URL = os.environ['WS_URL']
 
 
@@ -42,11 +43,20 @@ class Connection:
         self._websocket_future.add_done_callback(self._client_future_done)
 
     async def _establish_connection(self):
-        async with websockets.connect(self._ws_url,
-                                      max_size=MAX_PAYLOAD_SIZE) as websocket:
+        connect_fut = websockets.connect(self._ws_url, max_size=MAX_PAYLOAD_SIZE)
+        websocket = None
+        try:
+            websocket = await asyncio.wait_for(connect_fut, timeout=CONNECTION_ESTABLISH_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.debug(f'timed out connecting to {self._ws_url}')
+            return
+
+        try:
             signals.connection_established.send()
             with self._relay.with_node(RemoteRelayNode(websocket)):
                 await keepalive_forever(websocket)
+        finally:
+            await websocket.close()
 
     def disconnect(self):
         logger.info('requested disconnect: disconnecting from server')
@@ -100,7 +110,6 @@ if __name__ == '__main__':
     # do this first because the rest of the proggy depnds on this being
     # established as the event loop
     event_loop = QEventLoop(qapp)
-    event_loop.set_debug(True)
     asyncio.set_event_loop(event_loop)
 
     # we need this to make it so ^c will quit the program
@@ -109,9 +118,10 @@ if __name__ == '__main__':
     relay = Relay()
     with relay.with_node(ClientRelayNode(LocalClipboard.new(qapp))):
         connection = Connection(relay, WS_URL)
-        connection.connect()
-
         ui = start_ui(qapp, connection)
+        # XXX: we've gotta open the connection AFTER starting the UI, or else
+        # the UI will be in a bad state.
+        connection.connect()
 
         with event_loop:
                 event_loop.run_forever()
