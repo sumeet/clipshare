@@ -11,5 +11,4 @@ Pillow
 blinker
 cached_property
 asyncblink
-async_generator
 tenacity
