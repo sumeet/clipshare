@@ -3,10 +3,10 @@ import pickle
 
 from asyncblink import AsyncSignal
 
-from chunked_receiving import ChunkedMessageReceiver
-import log
-import signals
-from transfer_progress import ProgressSignaler
+from .chunked_receiving import ChunkedMessageReceiver
+from . import log
+from . import signals
+from .transfer_progress import ProgressSignaler
 
 
 logger = log.getLogger(__name__)

@@ -1,7 +1,7 @@
 from io import BytesIO
 from PIL import Image
 
-import log
+from . import log
 
 
 logger = log.get_logger(__name__)

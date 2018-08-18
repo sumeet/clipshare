@@ -6,8 +6,8 @@ class MustRunOnEitherMacOrLinux(Exception):
 
 
 if sys.platform == 'darwin':
-    from mac_clipboard import MacClipboard as LocalClipboard
+    from .mac_clipboard import MacClipboard as LocalClipboard
 elif sys.platform == 'linux':
-    from linux_clipboard import LinuxClipboard as LocalClipboard
+    from .linux_clipboard import LinuxClipboard as LocalClipboard
 else:
     raise MustRunOnEitherMacOrLinux

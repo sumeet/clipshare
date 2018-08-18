@@ -6,8 +6,8 @@ from PyQt5.QtCore import QByteArray
 from PyQt5.QtCore import QIODevice
 from PyQt5.QtCore import QMimeData
 
-import log
-from image import change_tiff_to_png
+from . import log
+from .image import change_tiff_to_png
 
 
 logger = log.getLogger(__name__)

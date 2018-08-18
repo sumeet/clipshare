@@ -2,10 +2,10 @@ import asyncio
 import os
 import websockets
 
-from relay import Relay
-from remote_relay_node import RemoteRelayNode
-from websocket import MAX_PAYLOAD_SIZE
-from websocket import keepalive_forever
+from .relay import Relay
+from .remote_relay_node import RemoteRelayNode
+from .websocket import MAX_PAYLOAD_SIZE
+from .websocket import keepalive_forever
 
 
 class Server:

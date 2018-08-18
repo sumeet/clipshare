@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 import functools
 
-import log
+from . import log
 
 
 logger = log.getLogger(__name__)

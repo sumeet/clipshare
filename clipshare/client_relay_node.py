@@ -2,10 +2,10 @@ from asyncio import ensure_future
 
 from asyncblink import AsyncSignal
 
-from chunked_sending import Message
-import log
-import signals
-from transfer_progress import ProgressSignaler
+from .chunked_sending import Message
+from . import log
+from . import signals
+from .transfer_progress import ProgressSignaler
 
 
 # TODO: tune this value to see if it affects speed

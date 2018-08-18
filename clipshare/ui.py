@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import QMenu
 from PyQt5.QtWidgets import QProgressDialog
 from PyQt5.QtWidgets import QSystemTrayIcon
 
-import log
+from . import log
 
 
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))

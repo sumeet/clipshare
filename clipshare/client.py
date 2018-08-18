@@ -7,15 +7,15 @@ from PyQt5.QtWidgets import QApplication
 from quamash import QEventLoop
 import websockets
 
-from client_relay_node import ClientRelayNode
-from local_clipboard import LocalClipboard
-import log
-from relay import Relay
-from remote_relay_node import RemoteRelayNode
-import signals
-from ui import UI
-from websocket import MAX_PAYLOAD_SIZE
-from websocket import keepalive_forever
+from .client_relay_node import ClientRelayNode
+from .local_clipboard import LocalClipboard
+from . import log
+from .relay import Relay
+from .remote_relay_node import RemoteRelayNode
+from . import signals
+from .ui import UI
+from .websocket import MAX_PAYLOAD_SIZE
+from .websocket import keepalive_forever
 
 
 logger = log.getLogger(__name__)
