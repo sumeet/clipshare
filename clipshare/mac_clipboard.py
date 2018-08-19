@@ -1,5 +1,4 @@
 import asyncio
-import log
 import time
 
 from ScriptingBridge import NSArray
@@ -12,6 +11,7 @@ from tenacity import retry_if_exception_type
 from tenacity import stop_after_attempt
 from tenacity import wait_fixed
 
+from . import log
 from .image import change_tiff_to_png
 
 
