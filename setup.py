@@ -35,5 +35,6 @@ setup(
     # need to include the colored icons used for the GUI
     package_data={'': ['*.png']},
     python_requires='>=3.6',
+    scripts=['bin/clipsharec'],
     install_requires=dependencies,
     zip_safe=False)
