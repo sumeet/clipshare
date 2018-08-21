@@ -20,8 +20,8 @@ logger = log.getLogger(__name__)
 
 class UI:
 
-    def __init__(self, qapp, connection):
-        self._tray = Tray(qapp, connection)
+    def __init__(self, qapp):
+        self._tray = Tray(qapp)
         self._progress_window = ProgressWindow(qapp)
 
     def start(self):
@@ -53,9 +53,14 @@ class Tray:
 
     RESET_ACTIVITY_INDICATOR_AFTER_SECONDS = 30
 
-    def __init__(self, qapp, connection):
+    class nullobject:
+        def __getattr__(self, name):
+            return type(self)()
+
+    # XXX: getting rid of the connection var here
+    def __init__(self, qapp):
         self._qapp = qapp
-        self._connection = connection
+        self._connection = self.nullobject()
 
         self._qsystem_tray_icon = QSystemTrayIcon()
         self._icons = Icons()
@@ -113,11 +118,12 @@ class Tray:
 
     def _add_pause_menu_action(self, menu):
         if self._connection.is_active:
+
             paused_action = menu.addAction('Pause clipboard syncing')
-            paused_action.triggered.connect(self._connection.disconnect)
+            #paused_action.triggered.connect(self._connection.disconnect)
         else:
             paused_action = menu.addAction('Connect to remote clipboard')
-            paused_action.triggered.connect(self._connection.connect)
+            #paused_action.triggered.connect(self._connection.connect)
 
     def _add_quit_menu_action(self, menu):
         quit_action = menu.addAction('Quit')

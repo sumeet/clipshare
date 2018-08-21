@@ -2,6 +2,7 @@ from asyncio import ensure_future
 import asyncio
 import os
 import signal
+import sys
 
 from PyQt5.QtWidgets import QApplication
 from quamash import QEventLoop
@@ -23,7 +24,6 @@ logger = log.getLogger(__name__)
 
 RECONNECT_WAIT_SECONDS = 5
 CONNECTION_ESTABLISH_TIMEOUT = 7
-WS_URL = os.environ['WS_URL']
 
 
 class Connection:
@@ -92,8 +92,8 @@ class Connection:
         self.connect()
 
 
-def start_ui(qapp, connection):
-    ui = UI(qapp, connection)
+def start_ui(qapp):
+    ui = UI(qapp)
     signals.incoming_transfer.connect(ui.handle_incoming_transfer_progress)
     signals.outgoing_transfer.connect(ui.handle_outgoing_transfer_progress)
 
@@ -105,6 +105,7 @@ def start_ui(qapp, connection):
 
 
 if __name__ == '__main__':
+    WS_URL = os.environ['WS_URL']
     qapp = QApplication([])
 
     # do this first because the rest of the proggy depnds on this being
