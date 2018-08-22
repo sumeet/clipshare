@@ -5,11 +5,27 @@ import sys
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QCursor
 from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtWidgets import QDialog
+from PyQt5.QtWidgets import QDialogButtonBox
+from PyQt5.QtWidgets import QFormLayout
+from PyQt5.QtWidgets import QGroupBox
+from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QMenu
+from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QProgressDialog
 from PyQt5.QtWidgets import QSystemTrayIcon
+from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QWidget
 
 from . import log
+from .settings import AppSettings
+from .settings import Boolean
+from .settings import IP
+from .settings import Port
+from .settings import SettingsForm
+from .settings import WebsocketURL
 
 
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -26,6 +42,17 @@ class UI:
 
     def start(self):
         self._tray.start()
+
+    # blocks until the notice is accepted
+    def show_notice(self, text):
+        qmessagebox = QMessageBox()
+        qmessagebox.setText(
+            'Clipshare must be configured to run in either client mode or '
+            "server mode before it'll sync your clipboard.")
+        return qmessagebox.exec_()
+
+    def show_settings_window(self):
+        return SettingsWindow.show()
 
     # XXX: the connection signals don't have send any args, but for some reason
     # blinker sends a None that causes an ArgumentError unless we just accept
@@ -53,6 +80,7 @@ class Tray:
 
     RESET_ACTIVITY_INDICATOR_AFTER_SECONDS = 30
 
+    # lol
     class nullobject:
         def __getattr__(self, name):
             return type(self)()
@@ -113,6 +141,7 @@ class Tray:
     def _rebuild_menu(self):
         menu = QMenu()
         self._add_pause_menu_action(menu)
+        self._add_preferences_menu_action(menu)
         self._add_quit_menu_action(menu)
         self._qsystem_tray_icon.setContextMenu(menu)
 
@@ -124,6 +153,11 @@ class Tray:
         else:
             paused_action = menu.addAction('Connect to remote clipboard')
             #paused_action.triggered.connect(self._connection.connect)
+
+    def _add_preferences_menu_action(self, menu):
+        preferences_action = menu.addAction('Preferences…')
+        preferences_action.triggered.connect(
+            lambda: asyncio.ensure_future(SettingsWindow().show()))
 
     def _add_quit_menu_action(self, menu):
         quit_action = menu.addAction('Quit')
@@ -255,3 +289,134 @@ def get_cursor_position(qapp):
     mouse_screen = qapp.desktop().screenNumber(global_cursor_pos)
     mouse_screen_geometry = qapp.desktop().screen(mouse_screen).geometry()
     return global_cursor_pos - mouse_screen_geometry.topLeft()
+
+
+QT_WIDGET_BY_FIELD_TYPE = {
+    Boolean: QCheckBox,
+    IP: QLineEdit,
+    Port: QLineEdit,
+    WebsocketURL: QLineEdit,
+}
+
+
+class SettingsWindow:
+
+    def __init__(self):
+        self._settings = AppSettings.get
+        self._qdialog = QDialog()
+        self._qdialog.setWindowTitle('Clipshare settings')
+        self._qdialog.accepted.connect(self._save_settings)
+
+    # awaitable
+    def show(self):
+        self._qt_form = self._build_qt_form()
+        self._render()
+
+        future = asyncio.Future()
+        self._qdialog.finished.connect(lambda result: future.set_result(None))
+
+        self._qdialog.exec_()
+        return future
+
+    def _render(self):
+        self._qt_form = self._build_qt_form()
+
+        main_layout = QVBoxLayout()
+
+        form_groupbox = QWidget()
+        form_groupbox.setLayout(self._qt_form.qlayout)
+        main_layout.addWidget(form_groupbox)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok |
+                                      QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self._qdialog.accept)
+        button_box.rejected.connect(self._qdialog.reject)
+        main_layout.addWidget(button_box)
+
+        old_qlayout = self._qdialog.layout()
+        if old_qlayout:
+            # reparenting the old layout to a temporary widget will reparent the
+            # old layout, allowing us to set a new one.
+            # see https://stackoverflow.com/a/10439207/149987
+            QWidget().setLayout(old_qlayout)
+        self._qdialog.setLayout(main_layout)
+
+    def _save_settings(self):
+        self._pull_settings_from_qt_form()
+        AppSettings.set(self._settings)
+
+    def _build_qt_form(self):
+        fields = SettingsForm(self._settings).fields
+        qt_form = QtForm.build(fields)
+
+        # if the client enabled checkbox is on, then enable the client fields
+        #
+        # same thing for server settings
+        for qcheckbox_widget in qt_form.qcheckbox_widgets:
+            qcheckbox_widget.stateChanged.connect(
+                lambda state: self._pull_settings_from_qt_form())
+
+        return qt_form
+
+    def _pull_settings_from_qt_form(self):
+        self._settings = build_settings_from_qt_form(self._qt_form)
+        self._render()
+
+
+class QtForm:
+
+    @classmethod
+    def build(cls, form_fields):
+        layout = QFormLayout()
+        qwidgets_by_label_text = {}
+        for field in form_fields:
+            qwidget = QT_WIDGET_BY_FIELD_TYPE[field.type_cls]()
+            cls._set_widget_value(qwidget, field.value)
+            qwidget.setDisabled(field.disabled)
+
+            layout.addRow(QLabel(field.label_text), qwidget)
+            qwidgets_by_label_text[field.label_text] = qwidget
+        return cls(layout, qwidgets_by_label_text)
+
+    def __init__(self, qformlayout, qwidgets_by_label_text):
+        self._qformlayout = qformlayout
+        self._qwidgets_by_label_text = qwidgets_by_label_text
+
+    @property
+    def qlayout(self):
+        return self._qformlayout
+
+    @property
+    def field_values(self):
+        return {label_text: self._get_widget_value(widget)
+                for label_text, widget in self._qwidgets_by_label_text.items()}
+
+    @property
+    def qcheckbox_widgets(self):
+        return (qwidget for qwidget in self._qwidgets_by_label_text.values() if
+                isinstance(qwidget, QCheckBox))
+
+    def _get_widget_value(self, qwidget):
+        if isinstance(qwidget, QCheckBox):
+            return qwidget.isChecked()
+        if isinstance(qwidget, QLineEdit):
+            return qwidget.text()
+        raise Exception(f'unknown widget type: {qwidget}')
+
+    @classmethod
+    def _set_widget_value(cls, qwidget, value):
+        if isinstance(qwidget, QCheckBox):
+            return qwidget.setChecked(value)
+        if isinstance(qwidget, QLineEdit):
+            return qwidget.setText(value)
+        raise Exception(f'unknown widget type: {qwidget}')
+
+
+def build_settings_from_qt_form(qt_form):
+    field_values = qt_form.field_values
+    return Settings(
+        is_server_enabled=field_values['Server enabled'],
+        server_listen_ip=field_values['Server bind IP'],
+        server_listen_port=field_values['Server bind port'],
+        is_client_enabled=field_values['Client enabled'],
+        client_ws_url=field_values['Websocket URL of server to connect to'])

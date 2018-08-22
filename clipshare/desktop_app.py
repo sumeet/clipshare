@@ -6,20 +6,32 @@ import sys
 from cached_property import cached_property
 from quamash import QEventLoop
 from PyQt5.QtWidgets import QApplication
-from PyQt5.QtWidgets import QMessageBox
 
 from . import log
+from . import signals
 from .client import Connection
-from .client import start_ui
 from .client_relay_node import ClientRelayNode
 from .local_clipboard import LocalClipboard
 from .relay import Relay
 from .server import Server
 from .settings import AppSettings
-from .settings import SettingsWindow
+from .ui import SettingsWindow
+from .ui import UI
 
 
 logger = log.getLogger(__name__)
+
+
+def start_ui(qapp):
+    ui = UI(qapp)
+    signals.incoming_transfer.connect(ui.handle_incoming_transfer_progress)
+    signals.outgoing_transfer.connect(ui.handle_outgoing_transfer_progress)
+
+    signals.connection_established.connect(ui.handle_connection_established)
+    signals.connection_connecting.connect(ui.handle_connection_connecting)
+    signals.connection_disconnected.connect(ui.handle_connection_disconnected)
+    ui.start()
+    return ui
 
 
 class DesktopApp:
@@ -32,18 +44,13 @@ class DesktopApp:
     async def start(self):
         ui = start_ui(self._qapp)
 
-        settings = AppSettings.get
         # either the client or the server must be running for this proggy to do
         # anything. keep prompting the user to do something til they choose
-        while (not settings.is_server_enabled) and (not settings.is_client_enabled):
-            qmessagebox = QMessageBox()
-            qmessagebox.setText(
+        while self._client_and_server_both_disabled_in_settings:
+            ui.show_notice(
                 'Clipshare must be configured to run in either client mode or '
                 "server mode before it'll sync your clipboard.")
-            qmessagebox.exec_()
-            await SettingsWindow().show()
-
-            settings = AppSettings.get
+            SettingsWindow().show()
 
         with self._relay.with_node(self._local_clipboard_relay_node):
             if settings.is_server_enabled:
@@ -68,6 +75,11 @@ class DesktopApp:
             # don't have to poll
             while True:
                 await asyncio.sleep(1.5)
+
+    @property
+    def _client_and_server_both_disabled_in_settings(self):
+        settings = AppSettings.get
+        return not (settings.is_server_enabled or settings.is_client_enabled)
 
 
     @cached_property

@@ -92,18 +92,6 @@ class Connection:
         self.connect()
 
 
-def start_ui(qapp):
-    ui = UI(qapp)
-    signals.incoming_transfer.connect(ui.handle_incoming_transfer_progress)
-    signals.outgoing_transfer.connect(ui.handle_outgoing_transfer_progress)
-
-    signals.connection_established.connect(ui.handle_connection_established)
-    signals.connection_connecting.connect(ui.handle_connection_connecting)
-    signals.connection_disconnected.connect(ui.handle_connection_disconnected)
-    ui.start()
-    return ui
-
-
 if __name__ == '__main__':
     WS_URL = os.environ['WS_URL']
     qapp = QApplication([])
