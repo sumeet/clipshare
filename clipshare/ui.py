@@ -157,7 +157,7 @@ class Tray:
     def _add_preferences_menu_action(self, menu):
         preferences_action = menu.addAction('Preferences…')
         preferences_action.triggered.connect(
-            lambda: SettingsWindow().show())
+            lambda: asyncio.ensure_future(SettingsWindow().show()))
 
     def _add_quit_menu_action(self, menu):
         quit_action = menu.addAction('Quit')

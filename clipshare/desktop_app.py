@@ -51,7 +51,8 @@ class DesktopApp:
             asyncio.ensure_future(self._show_configuration_required_warning())
 
         with self._relay.with_node(self._local_clipboard_relay_node):
-            AppSettings.on_change.connect(lambda *args: self._reload_settings())
+            AppSettings.on_change.connect(lambda *args: self._reload_settings(),
+                                          weak=False)
             self._reload_settings()
             event_loop.run_forever()
 
@@ -60,18 +61,22 @@ class DesktopApp:
 
         if ((not settings.is_server_enabled) or
             (self._different_server_requested_in_settings(settings))):
+            logger.debug('server either changed, or not enabled. stopping')
             self._stop_server_if_running()
 
         if settings.is_server_enabled and not self._server:
             self._server = Server(settings.server_listen_ip,
                                   settings.server_listen_port, self._relay)
+            logger.debug(f'starting server {self._server}')
             self._server.start()
 
         if ((not settings.is_client_enabled) or
             (self._client and self._client.ws_url != settings.client_ws_url)):
+            logger.debug(f'stopping the client')
             self._stop_client_if_running()
 
         if settings.is_client_enabled and not self._client:
+            logger.debug(f'starting client')
             self._client = Client(settings.client_ws_url, self._relay)
             self._client.connect()
 
