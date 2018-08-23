@@ -7,3 +7,5 @@ incoming_transfer = signal('incoming_transfer')
 connection_established = signal('connection_established')
 connection_connecting = signal('connection_connecting')
 connection_disconnected = signal('connection_disconnected')
+
+server_listening = signal('server_listening')

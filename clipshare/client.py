@@ -26,11 +26,12 @@ RECONNECT_WAIT_SECONDS = 5
 CONNECTION_ESTABLISH_TIMEOUT = 7
 
 
-class Connection:
+class Client:
 
-    def __init__(self, relay, ws_url):
+    def __init__(self, ws_url, relay):
+        self.ws_url = ws_url
+
         self._relay = relay
-        self._ws_url = ws_url
         self._websocket_future = None
 
     def connect(self):
@@ -43,12 +44,12 @@ class Connection:
         self._websocket_future.add_done_callback(self._client_future_done)
 
     async def _establish_connection(self):
-        connect_fut = websockets.connect(self._ws_url, max_size=MAX_PAYLOAD_SIZE)
+        connect_fut = websockets.connect(self.ws_url, max_size=MAX_PAYLOAD_SIZE)
         websocket = None
         try:
             websocket = await asyncio.wait_for(connect_fut, timeout=CONNECTION_ESTABLISH_TIMEOUT)
         except asyncio.TimeoutError:
-            logger.debug(f'timed out connecting to {self._ws_url}')
+            logger.debug(f'timed out connecting to {self.ws_url}')
             return
 
         try:
@@ -90,27 +91,3 @@ class Connection:
         logger.info(f'waiting {RECONNECT_WAIT_SECONDS} before reconnecting')
         await asyncio.sleep(RECONNECT_WAIT_SECONDS)
         self.connect()
-
-
-if __name__ == '__main__':
-    WS_URL = os.environ['WS_URL']
-    qapp = QApplication([])
-
-    # do this first because the rest of the proggy depnds on this being
-    # established as the event loop
-    event_loop = QEventLoop(qapp)
-    asyncio.set_event_loop(event_loop)
-
-    # we need this to make it so ^c will quit the program
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-
-    relay = Relay()
-    with relay.with_node(ClientRelayNode(LocalClipboard.new(qapp))):
-        connection = Connection(relay, WS_URL)
-        ui = start_ui(qapp, connection)
-        # XXX: we've gotta open the connection AFTER starting the UI, or else
-        # the UI will be in a bad state.
-        connection.connect()
-
-        with event_loop:
-                event_loop.run_forever()

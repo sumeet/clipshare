@@ -24,6 +24,7 @@ from .settings import AppSettings
 from .settings import Boolean
 from .settings import IP
 from .settings import Port
+from .settings import Settings
 from .settings import SettingsForm
 from .settings import WebsocketURL
 
@@ -43,16 +44,15 @@ class UI:
     def start(self):
         self._tray.start()
 
-    # blocks until the notice is accepted
-    def show_notice(self, text):
+    async def show_notice(self, text):
         qmessagebox = QMessageBox()
         qmessagebox.setText(
             'Clipshare must be configured to run in either client mode or '
             "server mode before it'll sync your clipboard.")
-        return qmessagebox.exec_()
+        await show_dialog(qmessagebox)
 
-    def show_settings_window(self):
-        return SettingsWindow.show()
+    async def show_settings_window(self):
+        await SettingsWindow().show()
 
     # XXX: the connection signals don't have send any args, but for some reason
     # blinker sends a None that causes an ArgumentError unless we just accept
@@ -157,7 +157,7 @@ class Tray:
     def _add_preferences_menu_action(self, menu):
         preferences_action = menu.addAction('Preferences…')
         preferences_action.triggered.connect(
-            lambda: asyncio.ensure_future(SettingsWindow().show()))
+            lambda: SettingsWindow().show())
 
     def _add_quit_menu_action(self, menu):
         quit_action = menu.addAction('Quit')
@@ -307,16 +307,10 @@ class SettingsWindow:
         self._qdialog.setWindowTitle('Clipshare settings')
         self._qdialog.accepted.connect(self._save_settings)
 
-    # awaitable
-    def show(self):
+    async def show(self):
         self._qt_form = self._build_qt_form()
         self._render()
-
-        future = asyncio.Future()
-        self._qdialog.finished.connect(lambda result: future.set_result(None))
-
-        self._qdialog.exec_()
-        return future
+        await show_dialog(self._qdialog)
 
     def _render(self):
         self._qt_form = self._build_qt_form()
@@ -420,3 +414,11 @@ def build_settings_from_qt_form(qt_form):
         server_listen_port=field_values['Server bind port'],
         is_client_enabled=field_values['Client enabled'],
         client_ws_url=field_values['Websocket URL of server to connect to'])
+
+
+# adapter to make qt dialogs awaitable
+def show_dialog(qdialog):
+    future = asyncio.Future()
+    qdialog.finished.connect(lambda result: future.set_result(result))
+    qdialog.show()
+    return future

@@ -3,13 +3,14 @@ import contextlib
 import signal
 import sys
 
+from async_generator import asynccontextmanager
 from cached_property import cached_property
 from quamash import QEventLoop
 from PyQt5.QtWidgets import QApplication
 
 from . import log
 from . import signals
-from .client import Connection
+from .client import Client
 from .client_relay_node import ClientRelayNode
 from .local_clipboard import LocalClipboard
 from .relay import Relay
@@ -39,42 +40,63 @@ class DesktopApp:
     def __init__(self, local_clipboard, qapp):
         self._local_clipboard = local_clipboard
         self._qapp = qapp
+
+        self._ui = start_ui(self._qapp)
         self._relay = Relay()
+        self._client = None
+        self._server = None
 
-    async def start(self):
-        ui = start_ui(self._qapp)
-
-        # either the client or the server must be running for this proggy to do
-        # anything. keep prompting the user to do something til they choose
-        while self._client_and_server_both_disabled_in_settings:
-            ui.show_notice(
-                'Clipshare must be configured to run in either client mode or '
-                "server mode before it'll sync your clipboard.")
-            SettingsWindow().show()
+    def start(self, event_loop):
+        if self._client_and_server_both_disabled_in_settings:
+            asyncio.ensure_future(self._show_configuration_required_warning())
 
         with self._relay.with_node(self._local_clipboard_relay_node):
-            if settings.is_server_enabled:
-                server = Server(self._relay)
-                asyncio.ensure_future(server.serve(settings.server_listen_ip,
-                                                   settings.server_listen_port))
+            AppSettings.on_change.connect(lambda *args: self._reload_settings())
+            self._reload_settings()
+            event_loop.run_forever()
 
+    def _reload_settings(self):
+        settings = AppSettings.get
 
-            #yield
+        if ((not settings.is_server_enabled) or
+            (self._different_server_requested_in_settings(settings))):
+            self._stop_server_if_running()
 
-            # TODO: when i code this, just disconnect the client on every save.
-            #
-            # it doesn't matter if the client disconnects every time we save,
-            # it shouldn't cause an interruption anyway.
-            if settings.is_client_enabled:
-                connection = Connection(self._relay, settings.client_ws_url)
-                ## XXX: we've gotta open the connection AFTER starting the UI, or else
-                ## the UI will be in a bad state.
-                connection.connect()
+        if settings.is_server_enabled and not self._server:
+            self._server = Server(settings.server_listen_ip,
+                                  settings.server_listen_port, self._relay)
+            self._server.start()
 
-            #nix this timer stuff, see if i can manage to do in a way where we
-            # don't have to poll
-            while True:
-                await asyncio.sleep(1.5)
+        if ((not settings.is_client_enabled) or
+            (self._client and self._client.ws_url != settings.client_ws_url)):
+            self._stop_client_if_running()
+
+        if settings.is_client_enabled and not self._client:
+            self._client = Client(settings.client_ws_url, self._relay)
+            self._client.connect()
+
+    def _different_server_requested_in_settings(self, settings):
+        return self._server and (
+            self._server.bind_host != settings.server_listen_ip or
+            self._server.port != settings.server_listen_port)
+
+    def _stop_server_if_running(self):
+        if self._server:
+            self._server.stop()
+            self._server = None
+
+    def _stop_client_if_running(self):
+        if self._client:
+            self._client.disconnect()
+            self._client = None
+
+    # either the client or the server must be running for this proggy to do
+    # anything. keep prompting the user to do something til they choose
+    async def _show_configuration_required_warning(self):
+        await self._ui.show_notice(
+            'Clipshare must be configured to run in either client mode or '
+            "server mode before it'll sync your clipboard.")
+        await self._ui.show_settings_window()
 
     @property
     def _client_and_server_both_disabled_in_settings(self):
@@ -98,12 +120,14 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     qapp = QApplication([])
+    # this keeps the event loop running forever, instead of the standard
+    # behavior of quitting as soon as the last window is closed.
+    qapp.setQuitOnLastWindowClosed(False)
+
     event_loop = QEventLoop(qapp)
     asyncio.set_event_loop(event_loop)
-    local_clipboard = LocalClipboard.new(qapp)
 
+    local_clipboard = LocalClipboard.new(qapp)
     desktop_app = DesktopApp(local_clipboard, qapp)
     with event_loop:
-        asyncio.ensure_future(desktop_app.start())
-        event_loop.run_forever()
-        logger.debug('exited the event loop')
+        desktop_app.start(event_loop)

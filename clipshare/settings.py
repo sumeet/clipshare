@@ -1,6 +1,7 @@
 import asyncio
 from collections import namedtuple
 
+from asyncblink import AsyncSignal
 from PyQt5.QtCore import QSettings
 
 
@@ -28,6 +29,8 @@ class classproperty:
 # global object holding app settings stored in QSettings
 class AppSettings:
 
+    on_change = AsyncSignal()
+
     @classproperty
     def get(cls):
         qsettings = cls._qsettings
@@ -46,6 +49,8 @@ class AppSettings:
         qsettings.setValue('server_listen_port', settings.server_listen_port)
         qsettings.setValue('is_client_enabled', settings.is_client_enabled)
         qsettings.setValue('client_ws_url', settings.client_ws_url)
+
+        cls.on_change.send()
 
     _qsettings = QSettings('sumeet', 'clipshare')
 
