@@ -12,3 +12,4 @@ blinker
 cached_property
 asyncblink
 tenacity
+async_generator

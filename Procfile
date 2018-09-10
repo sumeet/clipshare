@@ -1,1 +1,1 @@
-web: python server.py
+web: python3 -m clipshare.server
