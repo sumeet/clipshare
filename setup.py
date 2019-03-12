@@ -16,6 +16,7 @@ dependencies = [
     'Pillow',
     'blinker',
     'asyncblink',
+    'async_generator',
     'cached_property',
     'tenacity',
     # for mac, we use pyobjc (ScriptingBridge) to access the clipboard. on
